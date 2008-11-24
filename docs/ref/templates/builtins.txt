@@ -234,6 +234,35 @@ The for loop sets a number of variables available within the loop:
                                 current one
     ==========================  ================================================
 
+for ... empty
+^^^^^^^^^^^^^
+
+.. versionadded:: 1.1
+
+The ``for`` tag can take an optional ``{% empty %}`` clause that will be
+displayed if the given array is empty or could not be found::
+
+    <ul>
+    {% for athlete in athlete_list %}
+        <li>{{ athlete.name }}</li>
+    {% empty %}
+        <li>Sorry, no athlete in this list!</li>
+    {% endfor %}
+    <ul>
+
+The above is equivalent to -- but shorter, cleaner, and possibly faster
+than -- the following::
+
+    <ul>
+      {% if althete_list %}
+        {% for athlete in athlete_list %}
+          <li>{{ athlete.name }}</li>
+        {% endfor %}
+      {% else %}
+        <li>Sorry, no athletes in this list.</li>
+      {% endif %}
+    </ul>
+
 .. templatetag:: if
 
 if
@@ -1584,20 +1613,20 @@ Value       Argument                Outputs
 ==========  ======================  ==================================
 
 Other tags and filter libraries
-===============================
+-------------------------------
 
 Django comes with a couple of other template-tag libraries that you have to
 enable explicitly in your ``INSTALLED_APPS`` setting and enable in your
 template with the ``{% load %}`` tag.
 
 django.contrib.humanize
------------------------
+~~~~~~~~~~~~~~~~~~~~~~~
 
 A set of Django template filters useful for adding a "human touch" to data. See
 :ref:`ref-contrib-humanize`.
 
 django.contrib.markup
----------------------
+~~~~~~~~~~~~~~~~~~~~~
 
 A collection of template filters that implement these common markup languages:
 
@@ -1608,7 +1637,7 @@ A collection of template filters that implement these common markup languages:
 See :ref:`ref-contrib-markup`.
 
 django.contrib.webdesign
-------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 A collection of template tags that can be useful while designing a website,
 such as a generator of Lorem Ipsum text. See :ref:`ref-contrib-webdesign`.
