@@ -26,7 +26,7 @@ class AdminViewBasicTest(TestCase):
         """
         request = self.client.get('/test_admin/admin/admin_views/article/add')
         self.assertRedirects(request,
-            '/test_admin/admin/admin_views/article/add/'
+            '/test_admin/admin/admin_views/article/add/', status_code=301
         )
     
     def testBasicAddGet(self):

@@ -1,7 +1,10 @@
 import base64
 import re
+import types
+
 from django import http, template
 from django.contrib.admin import ModelAdmin
+from django.contrib.admin.util import admin_perm_test
 from django.contrib.auth import authenticate, login
 from django.db.models.base import ModelBase
 from django.core.exceptions import ImproperlyConfigured
@@ -34,8 +37,17 @@ class AdminSite(object):
     login_template = None
     app_index_template = None
 
-    def __init__(self):
+    def __init__(self, name=None):
         self._registry = {} # model_class class -> admin_class instance
+        # TODO Root path is used to calculate urls under the old root() method
+        # in order to maintain backwards compatibility we are leaving that in
+        # so root_path isn't needed, not sure what to do about this.
+        self.root_path = 'admin/'
+        if name is None:
+            name = ''
+        else:
+            name += '_'
+        self.name = name
 
     def register(self, model_or_iterable, admin_class=None, **options):
         """
@@ -121,6 +133,9 @@ class AdminSite(object):
 
         `url` is the remainder of the URL -- e.g. 'comments/comment/'.
         """
+        import warnings
+        warnings.warn("Using AdminSite.root() is deprecated, you should \
+            include(AdminSite.urls) instead", PendingDeprecationWarning)
         if request.method == 'GET' and not request.path.endswith('/'):
             return http.HttpResponseRedirect(request.path + '/')
 
@@ -159,7 +174,28 @@ class AdminSite(object):
                 return self.app_index(request, url)
 
         raise http.Http404('The requested admin page does not exist.')
-
+    
+    def _get_urls(self):
+        from django.conf.urls.defaults import patterns, url, include
+        from django.core.urlresolvers import RegexURLResolver
+        urls_module = types.ModuleType('%s.urls' % self.__class__.__name__)
+        urlpatterns = patterns('',
+            url(r'^$', lambda *args, **kwargs: self.index(*args, **kwargs), name='%sadmin_index' % self.name),
+            url(r'^logout/$', lambda *args, **kwargs: self.logout(*args, **kwargs), name='%sadmin_logout'),
+            url(r'^password_change/$', lambda *args, **kwargs: self.password_change(*args, **kwargs), name='%sadmin_password_change' % self.name),
+            url(r'^password_change/done/$', lambda *args, **kwargs: self.password_change_done(*args, **kwargs), name='%sadmin_password_change_done' % self.name),
+            url(r'^jsi18n/$', lambda *args, **kwargs: self.i18n_javascript(*args, **kwargs), name='%sadmin_jsi18n' % self.name),
+            url('^r/(?P<content_type_id>\d+)/(?P<object_id>.+)/$', 'django.views.defaults.shortcut'),
+            url('^(?P<app_label>\w+)/$', lambda *args, **kwargs: self.app_index(*args, **kwargs), name='%sadmin_app_list' % self.name),
+        )
+        for model, model_admin in self._registry.iteritems():
+            urlpatterns += patterns('',
+                url('^%s/%s/' % (model._meta.app_label, model._meta.module_name), include(model_admin.urls))
+            )
+        urls_module.urlpatterns = urlpatterns
+        return urls_module
+    urls = property(_get_urls)
+    
     def model_page(self, request, app_label, model_name, rest_of_url=None):
         """
         Handles the model-specific functionality of the admin site, delegating
@@ -183,6 +219,7 @@ class AdminSite(object):
         from django.contrib.auth.views import password_change
         return password_change(request,
             post_change_redirect='%spassword_change/done/' % self.root_path)
+    passoword_change = admin_perm_test(password_change)
 
     def password_change_done(self, request):
         """
@@ -190,6 +227,7 @@ class AdminSite(object):
         """
         from django.contrib.auth.views import password_change_done
         return password_change_done(request)
+    password_change_done = admin_perm_test(password_change_done)
 
     def i18n_javascript(self, request):
         """
@@ -203,6 +241,7 @@ class AdminSite(object):
         else:
             from django.views.i18n import null_javascript_catalog as javascript_catalog
         return javascript_catalog(request, packages='django.conf')
+    i18n_javascript = admin_perm_test(i18n_javascript)
 
     def logout(self, request):
         """
@@ -317,7 +356,7 @@ class AdminSite(object):
         return render_to_response(self.index_template or 'admin/index.html', context,
             context_instance=template.RequestContext(request)
         )
-    index = never_cache(index)
+    index = never_cache(admin_perm_test(index))
 
     def display_login_form(self, request, error_message='', extra_context=None):
         request.session.set_test_cookie()
@@ -377,6 +416,7 @@ class AdminSite(object):
         return render_to_response(self.app_index_template or 'admin/app_index.html', context,
             context_instance=template.RequestContext(request)
         )
+    app_index = admin_perm_test(app_index)
 
 # This global object represents the default admin site, for the common case.
 # You can instantiate AdminSite in your own code to create a custom admin site.

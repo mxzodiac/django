@@ -1027,7 +1027,7 @@ In this example, we register the default ``AdminSite`` instance
     admin.autodiscover()
 
     urlpatterns = patterns('',
-        ('^admin/(.*)', admin.site.root),
+        ('^admin/', include(admin.site.urls)),
     )
 
 Above we used ``admin.autodiscover()`` to automatically load the
@@ -1041,15 +1041,13 @@ In this example, we register the ``AdminSite`` instance
     from myproject.admin import admin_site
 
     urlpatterns = patterns('',
-        ('^myadmin/(.*)', admin_site.root),
+        ('^myadmin/', include(admin_site.urls)),
     )
 
 There is really no need to use autodiscover when using your own ``AdminSite``
 instance since you will likely be importing all the per-app admin.py modules
 in your ``myproject.admin`` module.
 
-Note that the regular expression in the URLpattern *must* group everything in
-the URL that comes after the URL root -- hence the ``(.*)`` in these examples.
 
 Multiple admin sites in the same URLconf
 ----------------------------------------
@@ -1068,6 +1066,6 @@ respectively::
     from myproject.admin import basic_site, advanced_site
 
     urlpatterns = patterns('',
-        ('^basic-admin/(.*)', basic_site.root),
-        ('^advanced-admin/(.*)', advanced_site.root),
+        ('^basic-admin/', include(basic_site.root)),
+        ('^advanced-admin/', include(advanced_site.root)),
     )

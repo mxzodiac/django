@@ -143,6 +143,8 @@ class RegexURLResolver(object):
         # urlconf_name is a string representing the module containing urlconfs.
         self.regex = re.compile(regex, re.UNICODE)
         self.urlconf_name = urlconf_name
+        if not isinstance(self.urlconf_name, basestring):
+            self._urlconf_module = self.urlconf_name
         self.callback = None
         self.default_kwargs = default_kwargs or {}
         self._reverse_dict = MultiValueDict()

@@ -1,3 +1,5 @@
+import types
+
 from django import forms, template
 from django.forms.formsets import all_valid
 from django.forms.models import modelform_factory, inlineformset_factory
@@ -5,7 +7,7 @@ from django.forms.models import BaseInlineFormSet
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.admin import widgets
 from django.contrib.admin import helpers
-from django.contrib.admin.util import quote, unquote, flatten_fieldsets, get_deleted_objects
+from django.contrib.admin.util import quote, unquote, flatten_fieldsets, get_deleted_objects, admin_perm_test
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
 from django.http import Http404, HttpResponse, HttpResponseRedirect
@@ -195,6 +197,22 @@ class ModelAdmin(BaseModelAdmin):
             return self.delete_view(request, unquote(url[:-7]))
         else:
             return self.change_view(request, unquote(url))
+
+    def _get_urls(self):
+        from django.conf.urls.defaults import patterns, url
+        urls_module = types.ModuleType('%s.urls' % self.__class__.__name__)
+        info = self.admin_site.name, self.model._meta.app_label, self.model._meta.module_name
+        urlpatterns = patterns('',
+            url(r'^$', lambda *args, **kwargs: self.changelist_view(*args, **kwargs), name='%sadmin_%s_%s_changelist' % info),
+            url(r'^add/$', lambda *args, **kwargs: self.add_view(*args, **kwargs), name='%sadmin_%s_%s_add' % info),
+            url(r'^(.+)/history/$', lambda *args, **kwargs: self.history_view(*args, **kwargs), name='%sadmin_%s_%s_history' % info),
+            url(r'^(.+)/delete/$', lambda *args, **kwargs: self.delete_view(*args, **kwargs), name='%sadmin_%s_%s_delete' % info),
+            url(r'^(.+)/$', lambda *args, **kwargs: self.change_view(*args, **kwargs), name='%sadmin_%s_%s_change' % info),
+        )
+        urls_module.urlpatterns = urlpatterns
+        return urls_module
+    urls = property(_get_urls)
+ 
 
     def _media(self):
         from django.conf import settings
@@ -537,7 +555,7 @@ class ModelAdmin(BaseModelAdmin):
         }
         context.update(extra_context or {})
         return self.render_change_form(request, context, add=True)
-    add_view = transaction.commit_on_success(add_view)
+    add_view = transaction.commit_on_success(admin_perm_test(add_view))
 
     def change_view(self, request, object_id, extra_context=None):
         "The 'change' admin view for this model."
@@ -545,7 +563,7 @@ class ModelAdmin(BaseModelAdmin):
         opts = model._meta
 
         try:
-            obj = model._default_manager.get(pk=object_id)
+            obj = model._default_manager.get(pk=unquote(object_id))
         except model.DoesNotExist:
             # Don't raise Http404 just yet, because we haven't checked
             # permissions yet. We don't want an unauthenticated user to be able
@@ -616,7 +634,7 @@ class ModelAdmin(BaseModelAdmin):
         }
         context.update(extra_context or {})
         return self.render_change_form(request, context, change=True, obj=obj)
-    change_view = transaction.commit_on_success(change_view)
+    change_view = transaction.commit_on_success(admin_perm_test(change_view))
 
     def changelist_view(self, request, extra_context=None):
         "The 'change list' admin view for this model."
@@ -652,6 +670,7 @@ class ModelAdmin(BaseModelAdmin):
             'admin/%s/change_list.html' % app_label,
             'admin/change_list.html'
         ], context, context_instance=template.RequestContext(request))
+    changelist_view = admin_perm_test(changelist_view)
 
     def delete_view(self, request, object_id, extra_context=None):
         "The 'delete' admin view for this model."
@@ -659,7 +678,7 @@ class ModelAdmin(BaseModelAdmin):
         app_label = opts.app_label
 
         try:
-            obj = self.model._default_manager.get(pk=object_id)
+            obj = self.model._default_manager.get(pk=unquote(object_id))
         except self.model.DoesNotExist:
             # Don't raise Http404 just yet, because we haven't checked
             # permissions yet. We don't want an unauthenticated user to be able
@@ -674,7 +693,7 @@ class ModelAdmin(BaseModelAdmin):
 
         # Populate deleted_objects, a data structure of all related objects that
         # will also be deleted.
-        deleted_objects = [mark_safe(u'%s: <a href="../../%s/">%s</a>' % (escape(force_unicode(capfirst(opts.verbose_name))), quote(object_id), escape(obj))), []]
+        deleted_objects = [mark_safe(u'%s: <a href="../../%s/">%s</a>' % (escape(force_unicode(capfirst(opts.verbose_name))), object_id, escape(obj))), []]
         perms_needed = set()
         get_deleted_objects(deleted_objects, perms_needed, request.user, obj, opts, 1, self.admin_site)
 
@@ -707,6 +726,7 @@ class ModelAdmin(BaseModelAdmin):
             "admin/%s/delete_confirmation.html" % app_label,
             "admin/delete_confirmation.html"
         ], context, context_instance=template.RequestContext(request))
+    delete_view = admin_perm_test(delete_view)
 
     def history_view(self, request, object_id, extra_context=None):
         "The 'history' admin view for this model."
@@ -734,6 +754,7 @@ class ModelAdmin(BaseModelAdmin):
             "admin/%s/object_history.html" % app_label,
             "admin/object_history.html"
         ], context, context_instance=template.RequestContext(request))
+    history_view = admin_perm_test(history_view)
 
 class InlineModelAdmin(BaseModelAdmin):
     """
