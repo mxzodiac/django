@@ -185,12 +185,12 @@ class AdminSite(object):
             url(r'^password_change/$', lambda *args, **kwargs: self.password_change(*args, **kwargs), name='%sadmin_password_change' % self.name),
             url(r'^password_change/done/$', lambda *args, **kwargs: self.password_change_done(*args, **kwargs), name='%sadmin_password_change_done' % self.name),
             url(r'^jsi18n/$', lambda *args, **kwargs: self.i18n_javascript(*args, **kwargs), name='%sadmin_jsi18n' % self.name),
-            url('^r/(?P<content_type_id>\d+)/(?P<object_id>.+)/$', 'django.views.defaults.shortcut'),
-            url('^(?P<app_label>\w+)/$', lambda *args, **kwargs: self.app_index(*args, **kwargs), name='%sadmin_app_list' % self.name),
+            url(r'^r/(?P<content_type_id>\d+)/(?P<object_id>.+)/$', 'django.views.defaults.shortcut'),
+            url(r'^(?P<app_label>\w+)/$', lambda *args, **kwargs: self.app_index(*args, **kwargs), name='%sadmin_app_list' % self.name),
         )
         for model, model_admin in self._registry.iteritems():
             urlpatterns += patterns('',
-                url('^%s/%s/' % (model._meta.app_label, model._meta.module_name), include(model_admin.urls))
+                url(r'^%s/%s/' % (model._meta.app_label, model._meta.module_name), include(model_admin.urls))
             )
         urls_module.urlpatterns = urlpatterns
         return urls_module
