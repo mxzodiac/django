@@ -63,6 +63,19 @@ def validate(cls, model):
     if hasattr(cls, 'list_per_page') and not isinstance(cls.list_per_page, int):
         raise ImproperlyConfigured("'%s.list_per_page' should be a integer."
                 % cls.__name__)
+    
+    if hasattr(cls, 'list_editable'):
+        check_isseq(cls, 'list_editable', cls.list_editable)
+        for idx, field in enumerate(cls.list_editable):
+            if field not in cls.list_display:
+                raise ImproperlyConfigured("'%s.list_editable[%d]' refers to "
+                    "'%s' which is not defined in 'list_display'."
+                    % (cls.__name__, idx, field))
+            if field in cls.dist_display_links:
+                raise ImproperlyConfigured("%s cannot be in both %s.list_editable"
+                    " and %s.list_display_links"
+                    % (field, cls.__name__, cls.__name__))
+                
 
     # search_fields = ()
     if hasattr(cls, 'search_fields'):
