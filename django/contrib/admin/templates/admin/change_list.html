@@ -22,11 +22,11 @@
 <ul class="object-tools"><li><a href="add/{% if is_popup %}?_popup=1{% endif %}" class="addlink">{% blocktrans with cl.opts.verbose_name as name %}Add {{ name }}{% endblocktrans %}</a></li></ul>
 {% endif %}
 {% endblock %}
-<div class="module{% if cl.has_filters %} filtered{% endif %}" id="changelist">
 {% if formset %}
     <form action="" method="POST">
     {{ formset.management_form }}
 {% endif %}
+<div class="module{% if cl.has_filters %} filtered{% endif %}" id="changelist">
 {% block search %}{% search_form cl %}{% endblock %}
 {% block date_hierarchy %}{% date_hierarchy cl %}{% endblock %}
 
@@ -44,12 +44,12 @@
 {% block pagination %}{% pagination cl %}{% endblock %}
 {% if formset %}
 {% endif %}
+</div>
 {% if formset %}
     <div class="submit-row">
         <input type="submit" name="_save" class="default" value="Save"/>
     </div>
     </form>
 {% endif %}
-</div>
 </div>
 {% endblock %}
