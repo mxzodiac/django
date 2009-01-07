@@ -1,6 +1,6 @@
 from django import forms, template
 from django.forms.formsets import all_valid
-from django.forms.models import modelform_factory, inlineformset_factory
+from django.forms.models import modelform_factory, modelformset_factory, inlineformset_factory
 from django.forms.models import BaseInlineFormSet
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.admin import widgets
@@ -160,6 +160,7 @@ class ModelAdmin(BaseModelAdmin):
     list_filter = ()
     list_select_related = False
     list_per_page = 100
+    list_editable = ()
     search_fields = ()
     date_hierarchy = None
     save_as = False
@@ -275,7 +276,10 @@ class ModelAdmin(BaseModelAdmin):
         }
         defaults.update(kwargs)
         return modelform_factory(self.model, **defaults)
-
+    
+    def get_changelist_formset(self, request, queryset, **kwargs):
+        return modelformset_factory(self.model, extra=0, fields=self.list_editable)
+    
     def get_formsets(self, request, obj=None):
         for inline in self.inline_instances:
             yield inline.get_formset(request, obj)
@@ -627,7 +631,7 @@ class ModelAdmin(BaseModelAdmin):
             raise PermissionDenied
         try:
             cl = ChangeList(request, self.model, self.list_display, self.list_display_links, self.list_filter,
-                self.date_hierarchy, self.search_fields, self.list_select_related, self.list_per_page, self)
+                self.date_hierarchy, self.search_fields, self.list_select_related, self.list_per_page, self.list_editable, self)
         except IncorrectLookupParameters:
             # Wacky lookup parameters were given, so redirect to the main
             # changelist page, without parameters, and pass an 'invalid=1'
@@ -637,11 +641,23 @@ class ModelAdmin(BaseModelAdmin):
             if ERROR_FLAG in request.GET.keys():
                 return render_to_response('admin/invalid_setup.html', {'title': _('Database error')})
             return HttpResponseRedirect(request.path + '?' + ERROR_FLAG + '=1')
+        
+        if request.method == "POST" and self.list_editable:
+            formset = self.get_changelist_formset(request, cl.get_query_set())(request.POST)
+            if formset.is_valid():
+                formset.save()
+                return HttpResponseRedirect(request.path)
+
+        if self.list_editable:
+            formset = self.get_changelist_formset(request, cl.get_query_set())()
+        else:
+            formset = None
 
         context = {
             'title': cl.title,
             'is_popup': cl.is_popup,
             'cl': cl,
+            'formset': formset,
             'has_add_permission': self.has_add_permission(request),
             'root_path': self.admin_site.root_path,
             'app_label': app_label,

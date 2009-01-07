@@ -1,7 +1,13 @@
 {% extends "admin/base_site.html" %}
 {% load adminmedia admin_list i18n %}
 
-{% block extrastyle %}{{ block.super }}<link rel="stylesheet" type="text/css" href="{% admin_media_prefix %}css/changelists.css" />{% endblock %}
+{% block extrastyle %}
+    {{ block.super }}
+    <link rel="stylesheet" type="text/css" href="{% admin_media_prefix %}css/changelists.css" />
+    {% if formset %}
+        <link rel="stylesheet" type="text/css" href="{% admin_media_prefix %}css/forms.css" />
+    {% endif %}
+{% endblock %}
 
 {% block bodyclass %}change-list{% endblock %}
 
@@ -17,6 +23,10 @@
 {% endif %}
 {% endblock %}
 <div class="module{% if cl.has_filters %} filtered{% endif %}" id="changelist">
+{% if formset %}
+    <form action="" method="POST">
+    {{ formset.management_form }}
+{% endif %}
 {% block search %}{% search_form cl %}{% endblock %}
 {% block date_hierarchy %}{% date_hierarchy cl %}{% endblock %}
 
@@ -30,9 +40,16 @@
 </div>
 {% endif %}
 {% endblock %}
-
-{% block result_list %}{% result_list cl %}{% endblock %}
+{% block result_list %}{% result_list cl formset %}{% endblock %}
 {% block pagination %}{% pagination cl %}{% endblock %}
+{% if formset %}
+{% endif %}
+{% if formset %}
+    <div class="submit-row">
+        <input type="submit" name="_save" class="default" value="Save"/>
+    </div>
+    </form>
+{% endif %}
 </div>
 </div>
 {% endblock %}
