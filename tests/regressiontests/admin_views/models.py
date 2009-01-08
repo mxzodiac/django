@@ -134,12 +134,26 @@ class Thing(models.Model):
 class ThingAdmin(admin.ModelAdmin):
     list_filter = ('color',)
 
+class Person(models.Model):
+    GENDER_CHOICES = (
+        (1, "Male"),
+        (2, "Female"),
+    )
+    name = models.CharField(max_length=100)
+    gender = models.IntegerField(choices=GENDER_CHOICES)
+    alive = models.BooleanField()
+
+class PersonAdmin(admin.ModelAdmin):
+    list_display = ('name', 'gender', 'alive')
+    list_editable = ('gender', 'alive')
+
 admin.site.register(Article, ArticleAdmin)
 admin.site.register(CustomArticle, CustomArticleAdmin)
 admin.site.register(Section, inlines=[ArticleInline])
 admin.site.register(ModelWithStringPrimaryKey)
 admin.site.register(Color)
 admin.site.register(Thing, ThingAdmin)
+admin.site.register(Person, PersonAdmin)
 
 # We intentionally register Promo and ChapterXtra1 but not Chapter nor ChapterXtra2.
 # That way we cover all four cases:

@@ -9,7 +9,7 @@ from django.contrib.admin.util import quote
 from django.utils.html import escape
 
 # local test models
-from models import Article, CustomArticle, Section, ModelWithStringPrimaryKey
+from models import Article, CustomArticle, Section, ModelWithStringPrimaryKey, Person
 
 class AdminViewBasicTest(TestCase):
     fixtures = ['admin-views-users.xml', 'admin-views-colors.xml']
@@ -735,3 +735,18 @@ class AdminViewUnicodeTest(TestCase):
         self.failUnlessEqual(response.status_code, 200)
         response = self.client.post('/test_admin/admin/admin_views/book/1/delete/', delete_dict)
         self.assertRedirects(response, '/test_admin/admin/admin_views/book/')
+
+class AdminViewListEditable(TestCase):
+    fixtures = ['admin-views-users.xml', 'admin-views-person.xml']
+    
+    def setUp(self):
+        self.client.login(username='super', password='secret')
+
+    def tearDown(self):
+        self.client.logout()
+    
+    def test_changelist_input_html(self):
+        response = self.client.get('/test_admin/admin/admin_views/person/')
+        self.failUnlessEqual(response.content.count("<input"), 9,)
+        self.failUnlessEqual(response.content.count("<select"), 3)
+
