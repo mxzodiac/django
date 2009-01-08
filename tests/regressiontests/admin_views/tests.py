@@ -749,4 +749,22 @@ class AdminViewListEditable(TestCase):
         response = self.client.get('/test_admin/admin/admin_views/person/')
         self.failUnlessEqual(response.content.count("<input"), 9,)
         self.failUnlessEqual(response.content.count("<select"), 3)
-
+    
+    def test_post_submission(self):
+        data = {
+            "form-TOTAL_FORMS": "3",
+            "form-INITIAL_FORMS": "3",
+            
+            "form-0-gender": "1",
+            "form-0-id": "1",
+            
+            "form-1-gender": "2",
+            "form-1-id": "2",
+            
+            "form-2-alive": True,
+            "form-2-gender": "1",
+            "form-2-id": "3",
+        }
+        self.client.post('/test_admin/admin/admin_views/person', data)
+        self.failUnlessEqual(Person.objects.get(name="John Mauchly").alive, False)
+        self.failUnlessEqual(Person.objects.get(name="Grace Hooper").gender, 2)
