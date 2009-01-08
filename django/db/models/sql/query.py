@@ -317,11 +317,13 @@ class BaseQuery(object):
         """
         Perform the same functionality as the as_sql() method, returning an
         SQL string and parameters. However, the alias prefixes are bumped
-        beforehand (in a copy -- the current query isn't changed).
+        beforehand (in a copy -- the current query isn't changed) and any
+        ordering is removed.
 
         Used when nesting this query inside another.
         """
         obj = self.clone()
+        obj.clear_ordering(True)
         obj.bump_prefix()
         return obj.as_sql()
 
@@ -1535,6 +1537,15 @@ class BaseQuery(object):
         Typically, this means no limits or offsets have been put on the results.
         """
         return not (self.low_mark or self.high_mark)
+
+    def clear_select_fields(self):
+        """
+        Clears the list of fields to select (but not extra_select columns).
+        Some queryset types completely replace any existing list of select
+        columns.
+        """
+        self.select = []
+        self.select_fields = []
 
     def add_fields(self, field_names, allow_m2m=True):
         """
