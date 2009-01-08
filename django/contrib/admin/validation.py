@@ -67,6 +67,11 @@ def validate(cls, model):
     if hasattr(cls, 'list_editable'):
         check_isseq(cls, 'list_editable', cls.list_editable)
         for idx, field in enumerate(cls.list_editable):
+            try:
+                opts.get_field_by_name(field)
+            except models.FieldDoesNotExist:
+                raise ImproperlyConfigured("'%s.list_editable[%d]' refers to a "
+                    "field not defiend on %s." % (cls.__name__, idx, model.__name__))
             if field not in cls.list_display:
                 raise ImproperlyConfigured("'%s.list_editable[%d]' refers to "
                     "'%s' which is not defined in 'list_display'."
