@@ -641,6 +641,19 @@ class QuerySet(object):
         """
         pass
 
+    def as_sql(self):
+        """
+        Returns the internal query's SQL and parameters (as a tuple).
+
+        This is a private (internal) method. The name is chosen to provide
+        uniformity with other interfaces (in particular, the Query class).
+        """
+        obj = self.values("pk")
+        return obj.query.as_nested_sql()
+
+    # When used as part of a nested query, a queryset will never be an "always
+    # empty" result.
+    value_annotation = True
 
 class ValuesQuerySet(QuerySet):
     def __init__(self, *args, **kwargs):
@@ -667,6 +680,7 @@ class ValuesQuerySet(QuerySet):
         Called by the _clone() method after initializing the rest of the
         instance.
         """
+        self.query.clear_select_fields()
         self.extra_names = []
         if self._fields:
             if not self.query.extra_select:
@@ -691,7 +705,10 @@ class ValuesQuerySet(QuerySet):
         Cloning a ValuesQuerySet preserves the current fields.
         """
         c = super(ValuesQuerySet, self)._clone(klass, **kwargs)
-        c._fields = self._fields[:]
+        if not hasattr(c, '_fields'):
+            # Only clone self._fields if _fields wasn't passed into the cloning
+            # call directly.
+            c._fields = self._fields[:]
         c.field_names = self.field_names
         c.extra_names = self.extra_names
         if setup and hasattr(c, '_setup_query'):
@@ -785,6 +802,10 @@ class EmptyQuerySet(QuerySet):
         # This slightly odd construction is because we need an empty generator
         # (it raises StopIteration immediately).
         yield iter([]).next()
+
+    # EmptyQuerySet is always an empty result in where-clauses (and similar
+    # situations).
+    value_annotation = False
 
 
 def get_cached_row(klass, row, index_start, max_depth=0, cur_depth=0,
