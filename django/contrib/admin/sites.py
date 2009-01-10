@@ -1,6 +1,5 @@
 import base64
 import re
-import types
 
 from django import http, template
 from django.contrib.admin import ModelAdmin
@@ -177,8 +176,6 @@ class AdminSite(object):
     
     def _get_urls(self):
         from django.conf.urls.defaults import patterns, url, include
-        from django.core.urlresolvers import RegexURLResolver
-        urls_module = types.ModuleType('%s.urls' % self.__class__.__name__)
         urlpatterns = patterns('',
             url(r'^$', lambda *args, **kwargs: self.index(*args, **kwargs), name='%sadmin_index' % self.name),
             url(r'^logout/$', lambda *args, **kwargs: self.logout(*args, **kwargs), name='%sadmin_logout'),
@@ -192,9 +189,11 @@ class AdminSite(object):
             urlpatterns += patterns('',
                 url(r'^%s/%s/' % (model._meta.app_label, model._meta.module_name), include(model_admin.urls))
             )
-        urls_module.urlpatterns = urlpatterns
-        return urls_module
-    urls = property(_get_urls)
+        return urlpatterns
+    
+    def urls(self):
+        return self._get_urls()
+    urls = property(urls)
     
     def model_page(self, request, app_label, model_name, rest_of_url=None):
         """

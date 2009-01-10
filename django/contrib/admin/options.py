@@ -1,5 +1,3 @@
-import types
-
 from django import forms, template
 from django.forms.formsets import all_valid
 from django.forms.models import modelform_factory, inlineformset_factory
@@ -200,7 +198,6 @@ class ModelAdmin(BaseModelAdmin):
 
     def _get_urls(self):
         from django.conf.urls.defaults import patterns, url
-        urls_module = types.ModuleType('%s.urls' % self.__class__.__name__)
         info = self.admin_site.name, self.model._meta.app_label, self.model._meta.module_name
         urlpatterns = patterns('',
             url(r'^$', lambda *args, **kwargs: self.changelist_view(*args, **kwargs), name='%sadmin_%s_%s_changelist' % info),
@@ -209,9 +206,11 @@ class ModelAdmin(BaseModelAdmin):
             url(r'^(.+)/delete/$', lambda *args, **kwargs: self.delete_view(*args, **kwargs), name='%sadmin_%s_%s_delete' % info),
             url(r'^(.+)/$', lambda *args, **kwargs: self.change_view(*args, **kwargs), name='%sadmin_%s_%s_change' % info),
         )
-        urls_module.urlpatterns = urlpatterns
-        return urls_module
-    urls = property(_get_urls)
+        return urlpatterns
+
+    def urls(self):
+        return self._get_urls()
+    urls = property(urls)
  
 
     def _media(self):
