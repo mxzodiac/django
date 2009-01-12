@@ -174,7 +174,7 @@ class AdminSite(object):
 
         raise http.Http404('The requested admin page does not exist.')
     
-    def _get_urls(self):
+    def get_urls(self):
         from django.conf.urls.defaults import patterns, url, include
         urlpatterns = patterns('',
             url(r'^$', lambda *args, **kwargs: self.index(*args, **kwargs), name='%sadmin_index' % self.name),
@@ -192,7 +192,7 @@ class AdminSite(object):
         return urlpatterns
     
     def urls(self):
-        return self._get_urls()
+        return self.get_urls()
     urls = property(urls)
     
     def model_page(self, request, app_label, model_name, rest_of_url=None):

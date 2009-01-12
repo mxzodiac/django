@@ -196,7 +196,7 @@ class ModelAdmin(BaseModelAdmin):
         else:
             return self.change_view(request, unquote(url))
 
-    def _get_urls(self):
+    def get_urls(self):
         from django.conf.urls.defaults import patterns, url
         info = self.admin_site.name, self.model._meta.app_label, self.model._meta.module_name
         urlpatterns = patterns('',
@@ -209,7 +209,7 @@ class ModelAdmin(BaseModelAdmin):
         return urlpatterns
 
     def urls(self):
-        return self._get_urls()
+        return self.get_urls()
     urls = property(urls)
  
 

@@ -632,6 +632,22 @@ model instance::
                 instance.save()
             formset.save_m2m()
 
+``get_urls(self)``
+~~~~~~~~~~~~~~~~~~~
+
+The ``get_urls`` method on a ``ModelAdmin`` returns the URLs to be used for 
+that ModelAdmin in the same way as a URLconf.  Therefore you can extend them as 
+documented in :ref:`topics-http-urls`::
+    
+    class MyModelAdmin(admin.ModelAdmin):
+        def get_urls(self):
+            urlpatterns = super(MyModelAdmin, self).get_urls()
+            urlpatterns += patterns(''
+                (r'^my_view/$', self.my_view)
+            )
+            return urlpatterns
+
+
 ``ModelAdmin`` media definitions
 --------------------------------
 
@@ -1066,6 +1082,27 @@ respectively::
     from myproject.admin import basic_site, advanced_site
 
     urlpatterns = patterns('',
-        ('^basic-admin/', include(basic_site.root)),
-        ('^advanced-admin/', include(advanced_site.root)),
+        ('^basic-admin/', include(basic_site.urls)),
+        ('^advanced-admin/', include(advanced_site.urls)),
     )
+
+Adding views to admin sites
+---------------------------
+
+It possible to add additional views to the admin site in the same way one can 
+add them to ``ModelAdmins``.  This by using the ``get_urls()`` method on an 
+AdminSite in the same way as documented on ``ModelAdmins``.
+
+Protecting Custom ``AdminSite`` and ``ModelAdmin``
+--------------------------------------------------
+
+By default all the views in the Django admin are protected so that only staff 
+members can access them.  If you add your own views to either a ``ModelAdmin`` 
+or ``AdminSite`` you should ensure that where necessary they are protected in 
+the same manner.  To do this use the ``admin_perm_test`` decorator provided in 
+``django.contrib.admin.utils.admin_perm_test``.  It can be used in the same way 
+as the ``login_requied`` decorator.
+
+.. note::
+    The ``admin_perm_test`` decorator can only be used on methods which are on 
+    ``ModelAdmins`` or ``AdminSites``, you cannot use it on arbitrary functions.
