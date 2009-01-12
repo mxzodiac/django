@@ -277,8 +277,16 @@ class ModelAdmin(BaseModelAdmin):
         defaults.update(kwargs)
         return modelform_factory(self.model, **defaults)
     
+    def get_changelist_form(self, request, **kwargs):
+        defaults = {
+            "formfield_callback": self.formfield_for_dbfield,
+        }
+        defaults.update(kwargs)
+        return modelform_factory(self.model, **defaults)
+    
     def get_changelist_formset(self, request, queryset, **kwargs):
-        return modelformset_factory(self.model, extra=0, fields=self.list_editable)
+        return modelformset_factory(self.model, self.get_changelist_form(request),
+            extra=0, fields=self.list_editable)
     
     def get_formsets(self, request, obj=None):
         for inline in self.inline_instances:
