@@ -642,7 +642,7 @@ documented in :ref:`topics-http-urls`::
     class MyModelAdmin(admin.ModelAdmin):
         def get_urls(self):
             urlpatterns = super(MyModelAdmin, self).get_urls()
-            urlpatterns += patterns(''
+            urlpatterns += patterns('',
                 (r'^my_view/$', self.my_view)
             )
             return urlpatterns
