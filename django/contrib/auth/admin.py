@@ -44,9 +44,9 @@ class UserAdmin(admin.ModelAdmin):
     def get_urls(self):
         from django.conf.urls.defaults import patterns
         urlpatterns = super(UserAdmin, self).get_urls()
-        urlpatterns += patterns('',
+        urlpatterns = patterns('',
             (r'^(\d+)/password/$', self.user_change_password)
-        )
+        ) + urlpatterns
         return urlpatterns
 
     def add_view(self, request):
