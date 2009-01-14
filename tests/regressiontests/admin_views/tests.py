@@ -186,6 +186,11 @@ class CustomModelAdminTest(AdminViewBasicTest):
         request = self.client.get('/test_admin/admin2/')
         self.assertTemplateUsed(request, 'custom_admin/index.html')
         self.assert_('Hello from a custom index template *bar*' in request.content)
+    
+    def testCustomAdminSiteView(self):
+        self.client.login(username='super', password='secret')
+        response = self.client.get('/test_admin/%s/my_view/' % self.urlbit)
+        self.assert_(response.content == "Django is a magical pony!", response.content)
 
 def get_perm(Model, perm):
     """Return the permission object, for the Model"""
