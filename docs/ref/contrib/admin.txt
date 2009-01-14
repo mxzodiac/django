@@ -641,12 +641,39 @@ documented in :ref:`topics-http-urls`::
     
     class MyModelAdmin(admin.ModelAdmin):
         def get_urls(self):
-            urlpatterns = super(MyModelAdmin, self).get_urls()
-            urlpatterns += patterns('',
+            urls = super(MyModelAdmin, self).get_urls()
+            my_urls = patterns('',
                 (r'^my_view/$', self.my_view)
-            )
-            return urlpatterns
+            ) 
+            return my_urls + urls
+            
+.. note::
 
+    Notice that the custom patterns are included *before* the regular admin
+    URLs: the admin URL patterns are very permissive and will match nearly
+    anything, so you'll usually want to prepend your custom URLs to the built-in
+    ones.
+
+Note, however, that the ``self.my_view`` function registered above will *not*
+have any permission check done; it'll be accessible to the general public. Since
+this is usually not what you want, Django provides a convience wrapper to check
+permissions. This wrapper is :meth:`AdminSite.admin_view` (i.e.
+``self.admin_site.admin_view`` inside a ``ModelAdmin`` instance); use it like
+so::
+
+    class MyModelAdmin(admin.ModelAdmin):
+        def get_urls(self):
+            urls = super(MyModelAdmin, self).get_urls()
+            my_urls = patterns('',
+                (r'^my_view/$', self.admin_site.admin_view(self.my_view))
+            ) 
+            return my_urls + urls
+
+Notice the wrapped view in the fifth line above::
+
+    (r'^my_view/$', self.admin_site.admin_view(self.my_view))
+    
+This wrapping will protect ``self.my_view`` from unauthorized access.
 
 ``ModelAdmin`` media definitions
 --------------------------------
@@ -1091,7 +1118,9 @@ Adding views to admin sites
 
 It possible to add additional views to the admin site in the same way one can 
 add them to ``ModelAdmins``.  This by using the ``get_urls()`` method on an 
-AdminSite in the same way as documented on ``ModelAdmins``.
+AdminSite in the same way as `described above`__
+
+__ `get_urls(self)`_
 
 Protecting Custom ``AdminSite`` and ``ModelAdmin``
 --------------------------------------------------
