@@ -6,18 +6,6 @@ from django.utils.text import capfirst
 from django.utils.encoding import force_unicode
 from django.utils.translation import ugettext as _
 
-def admin_perm_test(func):
-    def inner(admin_site_or_modeladmin, request, *args, **kwargs):
-        if hasattr(admin_site_or_modeladmin, 'has_permission'):
-            admin_site = admin_site_or_modeladmin
-        else:
-            admin_site = admin_site_or_modeladmin.admin_site
-        if not admin_site.has_permission(request):
-            return admin_site.login(request)
-        # User has right permisssions show the view
-        return func(admin_site_or_modeladmin, request, *args, **kwargs)
-    return inner
-
 def quote(s):
     """
     Ensure that primary key values do not confuse the admin URLs by escaping
