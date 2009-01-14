@@ -410,6 +410,12 @@ Set ``list_editable`` to allow users to edit a given field in bulk.
 ``list_editable`` should be a list of field names on the model.  Users will then
 be able to edit these fields from the changelist page.
 
+.. note::
+    
+    If you do not have a default ordering on your model, or in the model admin 
+    then this will produce inconsistant behavior because the forms and other 
+    items may not line up correctly since they have no particular order.
+
 ``list_filter``
 ~~~~~~~~~~~~~~~
 
