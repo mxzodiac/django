@@ -122,55 +122,7 @@ class AdminSite(object):
             raise ImproperlyConfigured("Put 'django.contrib.contenttypes' in your INSTALLED_APPS setting in order to use the admin application.")
         if 'django.core.context_processors.auth' not in settings.TEMPLATE_CONTEXT_PROCESSORS:
             raise ImproperlyConfigured("Put 'django.core.context_processors.auth' in your TEMPLATE_CONTEXT_PROCESSORS setting in order to use the admin application.")
-    
-    def root(self, request, url):
-        """
-        Handles main URL routing for the admin app.
         
-        `url` is the remainder of the URL -- e.g. 'comments/comment/'.
-        """
-        import warnings
-        warnings.warn("Using AdminSite.root() is deprecated, you should \
-            include(AdminSite.urls) instead", PendingDeprecationWarning)
-        if request.method == 'GET' and not request.path.endswith('/'):
-            return http.HttpResponseRedirect(request.path + '/')
-        
-        if settings.DEBUG:
-            self.check_dependencies()
-        
-        # Figure out the admin base URL path and stash it for later use
-        self.root_path = re.sub(re.escape(url) + '$', '', request.path)
-        
-        url = url.rstrip('/') # Trim trailing slash, if it exists.
-        
-        # The 'logout' view doesn't require that the person is logged in.
-        if url == 'logout':
-            return self.logout(request)
-        
-        # Check permission to continue or display login form.
-        if not self.has_permission(request):
-            return self.login(request)
-        
-        if url == '':
-            return self.index(request)
-        elif url == 'password_change':
-            return self.password_change(request)
-        elif url == 'password_change/done':
-            return self.password_change_done(request)
-        elif url == 'jsi18n':
-            return self.i18n_javascript(request)
-        # URLs starting with 'r/' are for the "View on site" links.
-        elif url.startswith('r/'):
-            from django.contrib.contenttypes.views import shortcut
-            return shortcut(request, *url.split('/')[1:])
-        else:
-            if '/' in url:
-                return self.model_page(request, *url.split('/', 2))
-            else:
-                return self.app_index(request, url)
-        
-        raise http.Http404('The requested admin page does not exist.')
-    
     def admin_view(self, view):
         """
         Decorator to create an "admin view attached to this ``AdminSite``. This
@@ -457,6 +409,67 @@ class AdminSite(object):
         return render_to_response(self.app_index_template or 'admin/app_index.html', context,
             context_instance=template.RequestContext(request)
         )
+        
+    #
+    def root(self, request, url):
+        """
+        DEPRECATED. This function is the old way of handling URL resolution, and
+        is deprecated in favor of real URL resolution -- see ``get_urls()``.
+        
+        This function still exists for backwards-compatibility; it will be
+        removed in Django 1.3.
+        """
+        import warnings
+        warnings.warn(
+            "AdminSite.root() is deprecated; use include(admin.site.urls) instead.", 
+            PendingDeprecationWarning
+        )
+        
+        #
+        # Again, remember that the following only exists for
+        # backwards-compatibility. Any new URLs, changes to existing URLs, or
+        # whatever need to be done up in get_urls(), above!
+        #
+        
+        if request.method == 'GET' and not request.path.endswith('/'):
+            return http.HttpResponseRedirect(request.path + '/')
+        
+        if settings.DEBUG:
+            self.check_dependencies()
+        
+        # Figure out the admin base URL path and stash it for later use
+        self.root_path = re.sub(re.escape(url) + '$', '', request.path)
+        
+        url = url.rstrip('/') # Trim trailing slash, if it exists.
+        
+        # The 'logout' view doesn't require that the person is logged in.
+        if url == 'logout':
+            return self.logout(request)
+        
+        # Check permission to continue or display login form.
+        if not self.has_permission(request):
+            return self.login(request)
+        
+        if url == '':
+            return self.index(request)
+        elif url == 'password_change':
+            return self.password_change(request)
+        elif url == 'password_change/done':
+            return self.password_change_done(request)
+        elif url == 'jsi18n':
+            return self.i18n_javascript(request)
+        # URLs starting with 'r/' are for the "View on site" links.
+        elif url.startswith('r/'):
+            from django.contrib.contenttypes.views import shortcut
+            return shortcut(request, *url.split('/')[1:])
+        else:
+            if '/' in url:
+                return self.model_page(request, *url.split('/', 2))
+            else:
+                return self.app_index(request, url)
+        
+        raise http.Http404('The requested admin page does not exist.')
+    
 
 # This global object represents the default admin site, for the common case.
 # You can instantiate AdminSite in your own code to create a custom admin site.
