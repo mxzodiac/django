@@ -43,11 +43,9 @@ class UserAdmin(admin.ModelAdmin):
     
     def get_urls(self):
         from django.conf.urls.defaults import patterns
-        urlpatterns = super(UserAdmin, self).get_urls()
-        urlpatterns = patterns('',
-            (r'^(\d+)/password/$', self.user_change_password)
-        ) + urlpatterns
-        return urlpatterns
+        return patterns('',
+            (r'^(\d+)/password/$', self.admin_site.admin_view(self.user_change_password))
+        ) + super(UserAdmin, self).get_urls()
 
     def add_view(self, request):
         # It's an error for a user to have add permission but NOT change
