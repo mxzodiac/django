@@ -675,7 +675,7 @@ class ModelAdmin(BaseModelAdmin):
             formset = self.get_changelist_formset(request, cl.get_query_set())(request.POST)
             if formset.is_valid():
                 formset.save()
-                return HttpResponseRedirect(request.path)
+                return HttpResponseRedirect(request.get_full_path())
         elif self.list_editable:
             formset = self.get_changelist_formset(request, cl.get_query_set())()
         else:
