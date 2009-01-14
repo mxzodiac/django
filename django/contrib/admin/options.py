@@ -305,7 +305,7 @@ class ModelAdmin(BaseModelAdmin):
         defaults.update(kwargs)
         return modelform_factory(self.model, **defaults)
     
-    def get_changelist_formset(self, request, queryset, **kwargs):
+    def get_changelist_formset(self, request, **kwargs):
         return modelformset_factory(self.model, self.get_changelist_form(request),
             extra=0, fields=self.list_editable)
     
@@ -671,13 +671,15 @@ class ModelAdmin(BaseModelAdmin):
                 return render_to_response('admin/invalid_setup.html', {'title': _('Database error')})
             return HttpResponseRedirect(request.path + '?' + ERROR_FLAG + '=1')
         
+        FormSet = self.get_changelist_formset(request)
+        
         if request.method == "POST" and self.list_editable:
-            formset = self.get_changelist_formset(request, cl.get_query_set())(request.POST)
+            formset = FormSet(request.POST, queryset=cl.result_list)
             if formset.is_valid():
                 formset.save()
                 return HttpResponseRedirect(request.get_full_path())
         elif self.list_editable:
-            formset = self.get_changelist_formset(request, cl.get_query_set())()
+            formset = FormSet(queryset=cl.result_list)
         else:
             formset = None
 

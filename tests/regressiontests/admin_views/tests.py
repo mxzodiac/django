@@ -747,10 +747,11 @@ class AdminViewListEditable(TestCase):
             "form-1-gender": "2",
             "form-1-id": "2",
             
-            "form-2-alive": True,
+            "form-2-alive": "",
             "form-2-gender": "1",
             "form-2-id": "3",
         }
-        self.client.post('/test_admin/admin/admin_views/person', data)
+        self.client.post('/test_admin/admin/admin_views/person/', data)
+
         self.failUnlessEqual(Person.objects.get(name="John Mauchly").alive, False)
         self.failUnlessEqual(Person.objects.get(name="Grace Hooper").gender, 2)

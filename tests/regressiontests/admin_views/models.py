@@ -142,10 +142,14 @@ class Person(models.Model):
     name = models.CharField(max_length=100)
     gender = models.IntegerField(choices=GENDER_CHOICES)
     alive = models.BooleanField()
+    
+    class Meta:
+        ordering = ["id"]
 
 class PersonAdmin(admin.ModelAdmin):
     list_display = ('name', 'gender', 'alive')
     list_editable = ('gender', 'alive')
+    ordering = ["id"]
 
 admin.site.register(Article, ArticleAdmin)
 admin.site.register(CustomArticle, CustomArticleAdmin)
