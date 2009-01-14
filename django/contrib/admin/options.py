@@ -756,6 +756,34 @@ class ModelAdmin(BaseModelAdmin):
             "admin/object_history.html"
         ], context, context_instance=template.RequestContext(request))
 
+    #
+    # DEPRECATED methods.
+    #
+    def __call__(self, request, url):
+        """
+        DEPRECATED: this is the old way of URL resolution, replaced by
+        ``get_urls()``. This only called by AdminSite.root(), which is also
+        deprecated.
+        
+        Again, remember that the following code only exists for
+        backwards-compatibility. Any new URLs, changes to existing URLs, or
+        whatever need to be done up in get_urls(), above!
+        
+        This function still exists for backwards-compatibility; it will be
+        removed in Django 1.3.
+        """
+        # Delegate to the appropriate method, based on the URL.
+        if url is None:
+            return self.changelist_view(request)
+        elif url == "add":
+            return self.add_view(request)
+        elif url.endswith('/history'):
+            return self.history_view(request, unquote(url[:-8]))
+        elif url.endswith('/delete'):
+            return self.delete_view(request, unquote(url[:-7]))
+        else:
+            return self.change_view(request, unquote(url))
+
 class InlineModelAdmin(BaseModelAdmin):
     """
     Options for inline editing of ``model`` instances.
@@ -821,31 +849,6 @@ class InlineModelAdmin(BaseModelAdmin):
             return self.declared_fieldsets
         form = self.get_formset(request).form
         return [(None, {'fields': form.base_fields.keys()})]
-        
-    def __call__(self, request, url):
-        """
-        DEPRECATED: this is the old way of URL resolution, replaced by
-        ``get_urls()``. This only called by AdminSite.root(), which is also
-        deprecated.
-        
-        Again, remember that the following code only exists for
-        backwards-compatibility. Any new URLs, changes to existing URLs, or
-        whatever need to be done up in get_urls(), above!
-        
-        This function still exists for backwards-compatibility; it will be
-        removed in Django 1.3.
-        """
-        # Delegate to the appropriate method, based on the URL.
-        if url is None:
-            return self.changelist_view(request)
-        elif url == "add":
-            return self.add_view(request)
-        elif url.endswith('/history'):
-            return self.history_view(request, unquote(url[:-8]))
-        elif url.endswith('/delete'):
-            return self.delete_view(request, unquote(url[:-7]))
-        else:
-            return self.change_view(request, unquote(url))
     
 class StackedInline(InlineModelAdmin):
     template = 'admin/edit_inline/stacked.html'

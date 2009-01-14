@@ -191,23 +191,7 @@ class AdminSite(object):
     def urls(self):
         return self.get_urls()
     urls = property(urls)
-    
-    def model_page(self, request, app_label, model_name, rest_of_url=None):
-        """
-        Handles the model-specific functionality of the admin site, delegating
-        to the appropriate ModelAdmin class.
-        """
-        from django.db import models
-        model = models.get_model(app_label, model_name)
-        if model is None:
-            raise http.Http404("App %r, model %r, not found." % (app_label, model_name))
-        try:
-            admin_obj = self._registry[model]
-        except KeyError:
-            raise http.Http404("This model exists but has not been registered with the admin site.")
-        return admin_obj(request, rest_of_url)
-    model_page = never_cache(model_page)
-    
+        
     def password_change(self, request):
         """
         Handles the "change password" task -- both form display and validation.
@@ -410,7 +394,6 @@ class AdminSite(object):
             context_instance=template.RequestContext(request)
         )
         
-    #
     def root(self, request, url):
         """
         DEPRECATED. This function is the old way of handling URL resolution, and
@@ -469,7 +452,22 @@ class AdminSite(object):
                 return self.app_index(request, url)
         
         raise http.Http404('The requested admin page does not exist.')
-    
+        
+    def model_page(self, request, app_label, model_name, rest_of_url=None):
+        """
+        DEPRECATED. This is the old way of handling a model view on the admin
+        site; the new views should use get_urls(), above.
+        """
+        from django.db import models
+        model = models.get_model(app_label, model_name)
+        if model is None:
+            raise http.Http404("App %r, model %r, not found." % (app_label, model_name))
+        try:
+            admin_obj = self._registry[model]
+        except KeyError:
+            raise http.Http404("This model exists but has not been registered with the admin site.")
+        return admin_obj(request, rest_of_url)
+    model_page = never_cache(model_page)    
 
 # This global object represents the default admin site, for the common case.
 # You can instantiate AdminSite in your own code to create a custom admin site.
