@@ -5,6 +5,7 @@ from django.core.files.storage import default_storage
 
 class Member(models.Model):
     name = models.CharField(max_length=100)
+    birthdate = models.DateTimeField(blank=True, null=True)
 
     def __unicode__(self):
         return self.name
@@ -40,6 +41,14 @@ class Inventory(models.Model):
 
    def __unicode__(self):
       return self.name
+      
+class Event(models.Model):
+    band = models.ForeignKey(Band)
+    date = models.DateField(blank=True, null=True)
+    start_time = models.TimeField(blank=True, null=True)
+    description = models.TextField(blank=True)
+    link = models.URLField(blank=True)
+    min_age = models.IntegerField(blank=True, null=True)
 
 __test__ = {'WIDGETS_TESTS': """
 >>> from datetime import datetime
