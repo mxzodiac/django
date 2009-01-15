@@ -6,6 +6,7 @@ from django.core.files.storage import default_storage
 class Member(models.Model):
     name = models.CharField(max_length=100)
     birthdate = models.DateTimeField(blank=True, null=True)
+    gender = models.CharField(max_length=1, blank=True, choices=[('M','Male'), ('F', 'Female')])
 
     def __unicode__(self):
         return self.name
