@@ -76,15 +76,17 @@ class BaseModelAdmin(object):
         # admin widgets - we just need to use a select widget of some kind.
         if db_field.choices:
             return self.formfield_for_choice_field(db_field, **kwargs)
-                    
-        # If we've got overrides for the formfield defined, use 'em. **kwargs
-        # passed to formfield_for_dbfield override the defaults.
-        if db_field.__class__ in self.formfield_overrides:
-            kwargs = dict(self.formfield_overrides[db_field.__class__], **kwargs)
-            return db_field.formfield(**kwargs)
         
         # ForeignKey or ManyToManyFields
         if isinstance(db_field, (models.ForeignKey, models.ManyToManyField)):
+            # Combine the field kwargs with any options for formfield_overrides.
+            # Make sure the passed in **kwargs override anything in 
+            # formfield_overrides because **kwargs is more specific, and should
+            # always win.
+            if db_field.__class__ in self.formfield_overrides:
+                kwargs = dict(self.formfield_overrides[db_field], **kwargs)
+            
+            # Get the correct formfield.
             if isinstance(db_field, models.ForeignKey):
                 formfield = self.formfield_for_foreignkey(db_field, **kwargs)
             elif isinstance(db_field, models.ManyToManyField):
@@ -98,7 +100,13 @@ class BaseModelAdmin(object):
                 formfield.widget = widgets.RelatedFieldWidgetWrapper(formfield.widget, db_field.rel, self.admin_site)
 
             return formfield
-                
+                    
+        # If we've got overrides for the formfield defined, use 'em. **kwargs
+        # passed to formfield_for_dbfield override the defaults.
+        if db_field.__class__ in self.formfield_overrides:
+            kwargs = dict(self.formfield_overrides[db_field.__class__], **kwargs)
+            return db_field.formfield(**kwargs)
+                        
         # For any other type of field, just call its formfield() method.
         return db_field.formfield(**kwargs)
         
