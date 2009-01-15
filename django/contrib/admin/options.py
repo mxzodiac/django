@@ -30,6 +30,7 @@ class IncorrectLookupParameters(Exception):
 
 class BaseModelAdmin(object):
     """Functionality common to both ModelAdmin and InlineAdmin."""
+    
     raw_id_fields = ()
     fields = None
     exclude = None
@@ -39,6 +40,21 @@ class BaseModelAdmin(object):
     filter_horizontal = ()
     radio_fields = {}
     prepopulated_fields = {}
+    
+    dbfield_formfield_overrides = { 
+        models.DateTimeField: { 
+            'form_class': forms.SplitDateTimeField,
+            'widget': widgets.AdminSplitDateTime 
+        },
+        models.DateField:    {'widget': widgets.AdminDateWidget},
+        models.TimeField:    {'widget': widgets.AdminTimeWidget},
+        models.TextField:    {'widget': widgets.AdminTextareaWidget},
+        models.URLField:     {'widget': widgets.AdminURLFieldWidget},
+        models.IntegerField: {'widget': widgets.AdminIntegerFieldWidget},
+        models.CharField:    {'widget': widgets.AdminTextInputWidget},
+        models.ImageField:   {'widget': widgets.AdminFileWidget},
+        models.FileField:    {'widget': widgets.AdminFileWidget},
+    }
     
     def formfield_for_dbfield(self, db_field, **kwargs):
         """
@@ -51,67 +67,14 @@ class BaseModelAdmin(object):
         # If the field specifies choices, we don't need to look for special
         # admin widgets - we just need to use a select widget of some kind.
         if db_field.choices:
-            if db_field.name in self.radio_fields:
-                # If the field is named as a radio_field, use a RadioSelect
-                kwargs['widget'] = widgets.AdminRadioSelect(attrs={
-                    'class': get_ul_class(self.radio_fields[db_field.name]),
-                })
-                kwargs['choices'] = db_field.get_choices(
-                    include_blank = db_field.blank,
-                    blank_choice=[('', _('None'))]
-                )
-                return db_field.formfield(**kwargs)
-            else:
-                # Otherwise, use the default select widget.
-                return db_field.formfield(**kwargs)
-        
-        # For DateTimeFields, use a special field and widget.
-        if isinstance(db_field, models.DateTimeField):
-            kwargs['form_class'] = forms.SplitDateTimeField
-            kwargs['widget'] = widgets.AdminSplitDateTime()
+            return self.formfield_for_choice_field(db_field, **kwargs)
+                    
+        # If we've got overrides for the formfield defined, use 'em.
+        if db_field.__class__ in self.dbfield_formfield_overrides:
+            kwargs = dict(self.dbfield_formfield_overrides[db_field], **kwargs)
             return db_field.formfield(**kwargs)
         
-        # For DateFields, add a custom CSS class.
-        if isinstance(db_field, models.DateField):
-            kwargs['widget'] = widgets.AdminDateWidget
-            return db_field.formfield(**kwargs)
-        
-        # For TimeFields, add a custom CSS class.
-        if isinstance(db_field, models.TimeField):
-            kwargs['widget'] = widgets.AdminTimeWidget
-            return db_field.formfield(**kwargs)
-        
-        # For TextFields, add a custom CSS class.
-        if isinstance(db_field, models.TextField):
-            kwargs['widget'] = widgets.AdminTextareaWidget
-            return db_field.formfield(**kwargs)
-        
-        # For URLFields, add a custom CSS class.
-        if isinstance(db_field, models.URLField):
-            kwargs['widget'] = widgets.AdminURLFieldWidget
-            return db_field.formfield(**kwargs)
-        
-        # For IntegerFields, add a custom CSS class.
-        if isinstance(db_field, models.IntegerField):
-            kwargs['widget'] = widgets.AdminIntegerFieldWidget
-            return db_field.formfield(**kwargs)
-        
-        # For CommaSeparatedIntegerFields, add a custom CSS class.
-        if isinstance(db_field, models.CommaSeparatedIntegerField):
-            kwargs['widget'] = widgets.AdminCommaSeparatedIntegerFieldWidget
-            return db_field.formfield(**kwargs)
-        
-        # For TextInputs, add a custom CSS class.
-        if isinstance(db_field, models.CharField):
-            kwargs['widget'] = widgets.AdminTextInputWidget
-            return db_field.formfield(**kwargs)
-        
-        # For FileFields and ImageFields add a link to the current file.
-        if isinstance(db_field, models.ImageField) or isinstance(db_field, models.FileField):
-            kwargs['widget'] = widgets.AdminFileWidget
-            return db_field.formfield(**kwargs)
-        
-        # For ForeignKey or ManyToManyFields, use a special widget.
+        # ForeignKey or ManyToManyFields.
         if isinstance(db_field, (models.ForeignKey, models.ManyToManyField)):
             if isinstance(db_field, models.ForeignKey) and db_field.name in self.raw_id_fields:
                 kwargs['widget'] = widgets.ForeignKeyRawIdWidget(db_field.rel)
@@ -143,6 +106,24 @@ class BaseModelAdmin(object):
         
         # For any other type of field, just call its formfield() method.
         return db_field.formfield(**kwargs)
+        
+    def formfield_for_choice_field(self, db_field, **kwargs):
+        """
+        Get a formfield for a dbfield that has declared choices.
+        """
+        if db_field.name in self.radio_fields:
+            # If the field is named as a radio_field, use a RadioSelect
+            kwargs['widget'] = widgets.AdminRadioSelect(attrs={
+                'class': get_ul_class(self.radio_fields[db_field.name]),
+            })
+            kwargs['choices'] = db_field.get_choices(
+                include_blank = db_field.blank,
+                blank_choice=[('', _('None'))]
+            )
+            return db_field.formfield(**kwargs)
+        else:
+            # Otherwise, use the default select widget.
+            return db_field.formfield(**kwargs)
     
     def _declared_fieldsets(self):
         if self.fieldsets:
