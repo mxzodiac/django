@@ -69,9 +69,10 @@ class BaseModelAdmin(object):
         if db_field.choices:
             return self.formfield_for_choice_field(db_field, **kwargs)
                     
-        # If we've got overrides for the formfield defined, use 'em.
+        # If we've got overrides for the formfield defined, use 'em. **kwargs
+        # passed to formfield_for_dbfield override the defaults.
         if db_field.__class__ in self.dbfield_formfield_overrides:
-            kwargs = dict(self.dbfield_formfield_overrides[db_field], **kwargs)
+            kwargs = dict(self.dbfield_formfield_overrides[db_field.__class__], **kwargs)
             return db_field.formfield(**kwargs)
         
         # ForeignKey or ManyToManyFields.
