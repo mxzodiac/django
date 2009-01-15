@@ -84,7 +84,7 @@ class BaseModelAdmin(object):
             # formfield_overrides because **kwargs is more specific, and should
             # always win.
             if db_field.__class__ in self.formfield_overrides:
-                kwargs = dict(self.formfield_overrides[db_field], **kwargs)
+                kwargs = dict(self.formfield_overrides[db_field.__class__], **kwargs)
             
             # Get the correct formfield.
             if isinstance(db_field, models.ForeignKey):
