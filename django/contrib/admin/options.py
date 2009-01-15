@@ -75,45 +75,31 @@ class BaseModelAdmin(object):
             kwargs = dict(self.dbfield_formfield_overrides[db_field.__class__], **kwargs)
             return db_field.formfield(**kwargs)
         
-        # ForeignKey or ManyToManyFields.
+        # ForeignKey or ManyToManyFields
         if isinstance(db_field, (models.ForeignKey, models.ManyToManyField)):
-            if isinstance(db_field, models.ForeignKey) and db_field.name in self.raw_id_fields:
-                kwargs['widget'] = widgets.ForeignKeyRawIdWidget(db_field.rel)
-            elif isinstance(db_field, models.ForeignKey) and db_field.name in self.radio_fields:
-                kwargs['widget'] = widgets.AdminRadioSelect(attrs={
-                    'class': get_ul_class(self.radio_fields[db_field.name]),
-                })
-                kwargs['empty_label'] = db_field.blank and _('None') or None
-            else:
-                if isinstance(db_field, models.ManyToManyField):
-                    # If it uses an intermediary model, don't show field in admin.
-                    if db_field.rel.through is not None:
-                        return None
-                    elif db_field.name in self.raw_id_fields:
-                        kwargs['widget'] = widgets.ManyToManyRawIdWidget(db_field.rel)
-                        kwargs['help_text'] = ''
-                    elif db_field.name in (list(self.filter_vertical) + list(self.filter_horizontal)):
-                        kwargs['widget'] = widgets.FilteredSelectMultiple(db_field.verbose_name, (db_field.name in self.filter_vertical))
-            # Wrap the widget's render() method with a method that adds
-            # extra HTML to the end of the rendered output.
-            formfield = db_field.formfield(**kwargs)
-            # Don't wrap raw_id fields. Their add function is in the popup window.
-            if not db_field.name in self.raw_id_fields:
-                # formfield can be None if it came from a OneToOneField with
-                # parent_link=True
-                if formfield is not None:
-                    formfield.widget = widgets.RelatedFieldWidgetWrapper(formfield.widget, db_field.rel, self.admin_site)
+            if isinstance(db_field, models.ForeignKey):
+                formfield = self.formfield_for_foreignkey(db_field, **kwargs)
+            elif isinstance(db_field, models.ManyToManyField):
+                formfield = self.formfield_for_manytomany(db_field, **kwargs)
+            
+            # For non-raw_id fields, wrap the widget with a wrapper that adds
+            # extra HTML -- the "add other" interface -- to the end of the
+            # rendered output. formfield can be None if it came from a 
+            # OneToOneField with parent_link=True or a M2M intermediary.
+            if formfield and db_field.name not in self.raw_id_fields:
+                formfield.widget = widgets.RelatedFieldWidgetWrapper(formfield.widget, db_field.rel, self.admin_site)
+
             return formfield
-        
+                
         # For any other type of field, just call its formfield() method.
         return db_field.formfield(**kwargs)
         
     def formfield_for_choice_field(self, db_field, **kwargs):
         """
-        Get a formfield for a dbfield that has declared choices.
+        Get a form Field for a database Field that has declared choices.
         """
+        # If the field is named as a radio_field, use a RadioSelect
         if db_field.name in self.radio_fields:
-            # If the field is named as a radio_field, use a RadioSelect
             kwargs['widget'] = widgets.AdminRadioSelect(attrs={
                 'class': get_ul_class(self.radio_fields[db_field.name]),
             })
@@ -121,10 +107,37 @@ class BaseModelAdmin(object):
                 include_blank = db_field.blank,
                 blank_choice=[('', _('None'))]
             )
-            return db_field.formfield(**kwargs)
-        else:
-            # Otherwise, use the default select widget.
-            return db_field.formfield(**kwargs)
+        return db_field.formfield(**kwargs)
+    
+    def formfield_for_foreignkey(self, db_field, **kwargs):
+        """
+        Get a form Field for a ForeignKey.
+        """
+        if db_field.name in self.raw_id_fields:
+            kwargs['widget'] = widgets.ForeignKeyRawIdWidget(db_field.rel)
+        elif db_field.name in self.radio_fields:
+            kwargs['widget'] = widgets.AdminRadioSelect(attrs={
+                'class': get_ul_class(self.radio_fields[db_field.name]),
+            })
+            kwargs['empty_label'] = db_field.blank and _('None') or None
+        
+        return db_field.formfield(**kwargs)
+
+    def formfield_for_manytomany(self, db_field, **kwargs):
+        """
+        Get a form Field for a ManyToManyField.
+        """
+        # If it uses an intermediary model, don't show field in admin.
+        if db_field.rel.through is not None:
+            return None
+        
+        if db_field.name in self.raw_id_fields:
+            kwargs['widget'] = widgets.ManyToManyRawIdWidget(db_field.rel)
+            kwargs['help_text'] = ''
+        elif db_field.name in (list(self.filter_vertical) + list(self.filter_horizontal)):
+            kwargs['widget'] = widgets.FilteredSelectMultiple(db_field.verbose_name, (db_field.name in self.filter_vertical))
+        
+        return db_field.formfield(**kwargs)
     
     def _declared_fieldsets(self):
         if self.fieldsets:
