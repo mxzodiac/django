@@ -9,28 +9,32 @@ class AdminFormfieldForDBFieldTests(TestCase):
     Tests for correct behavior of ModelAdmin.formfield_for_dbfield
     """
 
-    def assertFormfield(self, model, fieldname, widgetclass=None, **admin_overrides):
+    def assertFormfield(self, model, fieldname, widgetclass, **admin_overrides):
         """
         Helper to call formfield_for_dbfield for a given model and field name
         and verify that the returned formfield is appropriate.
         """
-        ma = admin.ModelAdmin(model, admin.site)
+        # Override any settings on the model admin
+        class MyModelAdmin(admin.ModelAdmin): pass
         for k in admin_overrides:
-            setattr(ma, k, admin_overrides[k])
-            
+            setattr(MyModelAdmin, k, admin_overrides[k])
+        
+        # Construct the admin, and ask it for a formfield
+        ma = MyModelAdmin(model, admin.site)
         ff = ma.formfield_for_dbfield(model._meta.get_field(fieldname))
-        if widgetclass:
-            # "unwrap" the widget wrapper, if needed
-            if isinstance(ff.widget, widgets.RelatedFieldWidgetWrapper):
-                widget = ff.widget.widget
-            else:
-                widget = ff.widget
-                
-            self.assert_(
-                isinstance(widget, widgetclass), 
-                "Wrong widget for %s.%s: expected %s, got %s" % \
-                    (model.__class__.__name__, fieldname, widgetclass, type(widget))
-            )
+        
+        # "unwrap" the widget wrapper, if needed
+        if isinstance(ff.widget, widgets.RelatedFieldWidgetWrapper):
+            widget = ff.widget.widget
+        else:
+            widget = ff.widget
+        
+        # Check that we got a field of the right type
+        self.assert_(
+            isinstance(widget, widgetclass), 
+            "Wrong widget for %s.%s: expected %s, got %s" % \
+                (model.__class__.__name__, fieldname, widgetclass, type(widget))
+        )
             
         # Return the formfield so that other tests can continue
         return ff
@@ -66,7 +70,7 @@ class AdminFormfieldForDBFieldTests(TestCase):
         self.assertFormfield(models.Event, 'band', widgets.ForeignKeyRawIdWidget,
                              raw_id_fields=['band'])
     
-    def testRadioFieldsForeighKey(self):
+    def testRadioFieldsForeignKey(self):
         ff = self.assertFormfield(models.Event, 'band', widgets.AdminRadioSelect, 
                                   radio_fields={'band':admin.VERTICAL})
         self.assertEqual(ff.empty_label, None)
@@ -81,3 +85,15 @@ class AdminFormfieldForDBFieldTests(TestCase):
     def testFilteredManyToMany(self):
         self.assertFormfield(models.Band, 'members', widgets.FilteredSelectMultiple,
                              filter_vertical=['members'])
+    
+    def testFormfieldOverrides(self):
+        self.assertFormfield(models.Event, 'date', forms.TextInput, 
+                             formfield_overrides={'widget': forms.TextInput})
+                             
+    def testFieldWithChoices(self):
+        self.assertFormfield(models.Member, 'gender', forms.Select)
+        
+    def testChoicesWithRadioFields(self):
+        self.assertFormfield(models.Member, 'gender', widgets.AdminRadioSelect, 
+                             radio_fields={'gender':admin.VERTICAL})
+        
