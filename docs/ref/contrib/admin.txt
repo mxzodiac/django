@@ -597,6 +597,36 @@ with an operator:
     Performs a full-text match. This is like the default search method but uses
     an index. Currently this is only available for MySQL.
 
+``formfield_overrides``
+-----------------------
+
+This provides a quick-and-dirty way to override some of the
+:class:`~django.forms.Field` options for use in the admin.
+``formfield_overrides`` is a dictionary mapping a field class to a dict of
+arguments to pass to the field at construction time.
+
+Since that's a bit abstract, let's look at a concrete example. The most common
+use of ``formfield_overrides`` is to add a custom widget for a certain type of
+field. So, imagine we've written a ``RichTextEditorWidget`` that we'd like to
+use for large text fields instead of the default ``<textarea>``. Here's how we'd
+do that::
+
+    from django.db import models
+    from django.contrib import admin
+    
+    # Import our custom widget and our model from where they're defined
+    from myapp.widgets import RichTextEditorWidget
+    from myapp.models import MyModel
+    
+    class MyModelAdmin(admin.ModelAdmin):
+        formfield_overrides = {
+            models.TextField: {'widget': RichTextEditorWidget}
+        }
+        
+Note that the key in the dictionary is the actual field class, *not* a string.
+The value is another dictionary; these arguments will be passed to
+:meth:`~django.forms.Field.__init__`. See :ref:`ref-forms-api` for details.
+
 ``ModelAdmin`` methods
 ----------------------
 

@@ -28,6 +28,25 @@ get_ul_class = lambda x: 'radiolist%s' % ((x == HORIZONTAL) and ' inline' or '')
 class IncorrectLookupParameters(Exception):
     pass
 
+# Defaults for dbfield_formfield_overrides. ModelAdmin subclasses can change this
+# by adding to ModelAdmin.dbfield_formfield_overrides.
+    
+FORMFIELD_FOR_DBFIELD_DEFAULTS = {
+    models.DateTimeField: { 
+        'form_class': forms.SplitDateTimeField,
+        'widget': widgets.AdminSplitDateTime 
+    },
+    models.DateField:    {'widget': widgets.AdminDateWidget},
+    models.TimeField:    {'widget': widgets.AdminTimeWidget},
+    models.TextField:    {'widget': widgets.AdminTextareaWidget},
+    models.URLField:     {'widget': widgets.AdminURLFieldWidget},
+    models.IntegerField: {'widget': widgets.AdminIntegerFieldWidget},
+    models.CharField:    {'widget': widgets.AdminTextInputWidget},
+    models.ImageField:   {'widget': widgets.AdminFileWidget},
+    models.FileField:    {'widget': widgets.AdminFileWidget},
+}
+
+
 class BaseModelAdmin(object):
     """Functionality common to both ModelAdmin and InlineAdmin."""
     
@@ -40,21 +59,10 @@ class BaseModelAdmin(object):
     filter_horizontal = ()
     radio_fields = {}
     prepopulated_fields = {}
+    formfield_overrides = {}
     
-    dbfield_formfield_overrides = { 
-        models.DateTimeField: { 
-            'form_class': forms.SplitDateTimeField,
-            'widget': widgets.AdminSplitDateTime 
-        },
-        models.DateField:    {'widget': widgets.AdminDateWidget},
-        models.TimeField:    {'widget': widgets.AdminTimeWidget},
-        models.TextField:    {'widget': widgets.AdminTextareaWidget},
-        models.URLField:     {'widget': widgets.AdminURLFieldWidget},
-        models.IntegerField: {'widget': widgets.AdminIntegerFieldWidget},
-        models.CharField:    {'widget': widgets.AdminTextInputWidget},
-        models.ImageField:   {'widget': widgets.AdminFileWidget},
-        models.FileField:    {'widget': widgets.AdminFileWidget},
-    }
+    def __init__(self):
+        self.formfield_overrides = dict(FORMFIELD_FOR_DBFIELD_DEFAULTS, **self.formfield_overrides)
     
     def formfield_for_dbfield(self, db_field, **kwargs):
         """
@@ -71,8 +79,8 @@ class BaseModelAdmin(object):
                     
         # If we've got overrides for the formfield defined, use 'em. **kwargs
         # passed to formfield_for_dbfield override the defaults.
-        if db_field.__class__ in self.dbfield_formfield_overrides:
-            kwargs = dict(self.dbfield_formfield_overrides[db_field.__class__], **kwargs)
+        if db_field.__class__ in self.formfield_overrides:
+            kwargs = dict(self.formfield_overrides[db_field.__class__], **kwargs)
             return db_field.formfield(**kwargs)
         
         # ForeignKey or ManyToManyFields
