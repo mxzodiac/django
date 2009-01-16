@@ -2,6 +2,7 @@ from django import forms
 from django.contrib import admin
 from django.contrib.admin import widgets
 from unittest import TestCase
+from django.test import TestCase as DjangoTestCase
 import models
 
 class AdminFormfieldForDBFieldTests(TestCase):
@@ -21,7 +22,7 @@ class AdminFormfieldForDBFieldTests(TestCase):
         
         # Construct the admin, and ask it for a formfield
         ma = MyModelAdmin(model, admin.site)
-        ff = ma.formfield_for_dbfield(model._meta.get_field(fieldname))
+        ff = ma.formfield_for_dbfield(model._meta.get_field(fieldname), request=None)
         
         # "unwrap" the widget wrapper, if needed
         if isinstance(ff.widget, widgets.RelatedFieldWidgetWrapper):
@@ -96,4 +97,16 @@ class AdminFormfieldForDBFieldTests(TestCase):
     def testChoicesWithRadioFields(self):
         self.assertFormfield(models.Member, 'gender', widgets.AdminRadioSelect, 
                              radio_fields={'gender':admin.VERTICAL})
-        
+
+
+class AdminFormfieldForDBFieldWithRequestTests(DjangoTestCase):
+    fixtures = ["admin-widgets-users.xml"]
+    
+    def testFilterChoicesByRequestUser(self):
+        """
+        Ensure the user can only see their own cars in the foreign key dropdown.
+        """
+        self.client.login(username="super", password="secret")
+        response = self.client.get("/widget_admin/admin_widgets/cartire/add/")
+        self.assert_("BMW M3" not in response.content)
+        self.assert_("Volkswagon Passat" in response.content)
