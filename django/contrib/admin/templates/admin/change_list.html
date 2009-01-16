@@ -42,14 +42,14 @@
                 </ul>
             {% endif %}
         {% endblock %}
+        {% block search %}
+            {% search_form cl %}
+        {% endblock %}
         {% if formset %}
-            <form action="" method="POST">
+            <form action="" method="post">
             {{ formset.management_form }}
         {% endif %}
         <div class="module{% if cl.has_filters %} filtered{% endif %}" id="changelist">
-            {% block search %}
-                {% search_form cl %}
-            {% endblock %}
             {% block date_hierarchy %}
                 {% date_hierarchy cl %}
             {% endblock %}

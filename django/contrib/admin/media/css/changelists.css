@@ -62,23 +62,23 @@
 
 /* TOOLBAR */
 
-#changelist #toolbar {
+#toolbar {
     padding: 3px;
     border-bottom: 1px solid #ddd;
     background: #e1e1e1 url(../img/admin/nav-bg.gif) top left repeat-x;
     color: #666;
 }
 
-#changelist #toolbar form input {
+#toolbar form input {
     font-size: 11px;
     padding: 1px 2px;
 }
 
-#changelist #toolbar form #searchbar {
+#toolbar form #searchbar {
     padding: 2px;
 }
 
-#changelist #changelist-search img {
+#changelist-search img {
     vertical-align: middle;
 }
 
