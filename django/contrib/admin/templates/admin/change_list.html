@@ -42,14 +42,10 @@
                 </ul>
             {% endif %}
         {% endblock %}
-        {% block search %}
-            {% search_form cl %}
-        {% endblock %}
-        {% if formset %}
-            <form action="" method="post">
-            {{ formset.management_form }}
-        {% endif %}
         <div class="module{% if cl.has_filters %} filtered{% endif %}" id="changelist">
+            {% block search %}
+                {% search_form cl %}
+            {% endblock %}
             {% block date_hierarchy %}
                 {% date_hierarchy cl %}
             {% endblock %}
@@ -64,18 +60,20 @@
                     </div>
                 {% endif %}
             {% endblock %}
+            {% if formset %}
+                <form action="" method="post">
+                {{ formset.management_form }}
+            {% endif %}
+
             {% block result_list %}
                 {% result_list cl formset %}
             {% endblock %}
             {% block pagination %}
-                {% pagination cl %}
+                {% pagination cl formset %}
             {% endblock %}
+            {% if formset %}
+                </form>
+            {% endif %}
         </div>
-        {% if formset %}
-            <div class="submit-row">
-                <input type="submit" name="_save" class="default" value="Save"/>
-            </div>
-            </form>
-        {% endif %}
     </div>
 {% endblock %}
