@@ -13,6 +13,7 @@ from django.shortcuts import get_object_or_404, render_to_response
 from django.utils.functional import update_wrapper
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
+from django.utils.functional import curry
 from django.utils.text import capfirst, get_text_list
 from django.utils.translation import ugettext as _
 from django.utils.encoding import force_unicode
@@ -71,11 +72,12 @@ class BaseModelAdmin(object):
         
         If kwargs are given, they're passed to the form Field's constructor.
         """
+        request = kwargs.pop("request")
         
         # If the field specifies choices, we don't need to look for special
         # admin widgets - we just need to use a select widget of some kind.
         if db_field.choices:
-            return self.formfield_for_choice_field(db_field, **kwargs)
+            return self.formfield_for_choice_field(db_field, request, **kwargs)
         
         # ForeignKey or ManyToManyFields
         if isinstance(db_field, (models.ForeignKey, models.ManyToManyField)):
@@ -88,9 +90,9 @@ class BaseModelAdmin(object):
             
             # Get the correct formfield.
             if isinstance(db_field, models.ForeignKey):
-                formfield = self.formfield_for_foreignkey(db_field, **kwargs)
+                formfield = self.formfield_for_foreignkey(db_field, request, **kwargs)
             elif isinstance(db_field, models.ManyToManyField):
-                formfield = self.formfield_for_manytomany(db_field, **kwargs)
+                formfield = self.formfield_for_manytomany(db_field, request, **kwargs)
             
             # For non-raw_id fields, wrap the widget with a wrapper that adds
             # extra HTML -- the "add other" interface -- to the end of the
@@ -110,7 +112,7 @@ class BaseModelAdmin(object):
         # For any other type of field, just call its formfield() method.
         return db_field.formfield(**kwargs)
         
-    def formfield_for_choice_field(self, db_field, **kwargs):
+    def formfield_for_choice_field(self, db_field, request, **kwargs):
         """
         Get a form Field for a database Field that has declared choices.
         """
@@ -128,7 +130,7 @@ class BaseModelAdmin(object):
                 )
         return db_field.formfield(**kwargs)
     
-    def formfield_for_foreignkey(self, db_field, **kwargs):
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
         """
         Get a form Field for a ForeignKey.
         """
@@ -142,7 +144,7 @@ class BaseModelAdmin(object):
         
         return db_field.formfield(**kwargs)
 
-    def formfield_for_manytomany(self, db_field, **kwargs):
+    def formfield_for_manytomany(self, db_field, request, **kwargs):
         """
         Get a form Field for a ManyToManyField.
         """
@@ -306,7 +308,7 @@ class ModelAdmin(BaseModelAdmin):
             "form": self.form,
             "fields": fields,
             "exclude": exclude + kwargs.get("exclude", []),
-            "formfield_callback": self.formfield_for_dbfield,
+            "formfield_callback": curry(self.formfield_for_dbfield, request=request),
         }
         defaults.update(kwargs)
         return modelform_factory(self.model, **defaults)

@@ -2,6 +2,7 @@
 from django.conf import settings
 from django.db import models
 from django.core.files.storage import default_storage
+from django.contrib.auth.models import User
 
 class Member(models.Model):
     name = models.CharField(max_length=100)
@@ -50,6 +51,25 @@ class Event(models.Model):
     description = models.TextField(blank=True)
     link = models.URLField(blank=True)
     min_age = models.IntegerField(blank=True, null=True)
+<<<<<<< HEAD:tests/regressiontests/admin_widgets/models.py
+=======
+
+class Car(models.Model):
+    owner = models.ForeignKey(User)
+    make = models.CharField(max_length=30)
+    model = models.CharField(max_length=30)
+    
+    def __unicode__(self):
+        return u"%s %s" % (self.make, self.model)
+
+class CarTire(models.Model):
+    """
+    A single car tire.
+    This is for admin widgets to ensure a user can only select their
+    own cars.
+    """
+    car = models.ForeignKey(Car)
+>>>>>>> brosner/8306-admin-field-overrides:tests/regressiontests/admin_widgets/models.py
 
 __test__ = {'WIDGETS_TESTS': """
 >>> from datetime import datetime
