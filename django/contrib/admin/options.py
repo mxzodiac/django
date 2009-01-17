@@ -316,14 +316,16 @@ class ModelAdmin(BaseModelAdmin):
     
     def get_changelist_form(self, request, **kwargs):
         defaults = {
-            "formfield_callback": self.formfield_for_dbfield,
+            "formfield_callback": curry(self.formfield_for_dbfield, 
+                request=request),
         }
         defaults.update(kwargs)
         return modelform_factory(self.model, **defaults)
     
     def get_changelist_formset(self, request, **kwargs):
-        return modelformset_factory(self.model, self.get_changelist_form(request),
-            extra=0, fields=self.list_editable)
+        return modelformset_factory(self.model, 
+            self.get_changelist_form(request), extra=0, 
+            fields=self.list_editable)
     
     def get_formsets(self, request, obj=None):
         for inline in self.inline_instances:
@@ -692,7 +694,12 @@ class ModelAdmin(BaseModelAdmin):
         if request.method == "POST" and self.list_editable:
             formset = FormSet(request.POST, queryset=cl.result_list)
             if formset.is_valid():
-                formset.save()
+                for form in formset.forms:
+                    obj = self.save_form(request, form, change=True)
+                    self.save_model(request, obj, form, change=True)
+                    form.save_m2m()
+                    change_msg = self.construct_change_message(request, form, None)
+                    self.log_change(request, obj, change_msg)
                 return HttpResponseRedirect(request.get_full_path())
         elif self.list_editable:
             formset = FormSet(queryset=cl.result_list)
