@@ -407,8 +407,8 @@ Finally, note that in order to use ``list_display_links``, you must define
 ~~~~~~~~~~~~~~~~~
 
 Set ``list_editable`` to allow users to edit a given field in bulk.  
-``list_editable`` should be a list of field names on the model.  Users will then
-be able to edit these fields from the changelist page.
+``list_editable`` should be a list of field names on the model.  Users will 
+then be able to edit these fields from the changelist page.
 
 .. note::
     
