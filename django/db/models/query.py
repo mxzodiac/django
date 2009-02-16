@@ -280,8 +280,9 @@ class QuerySet(object):
 
         for row in self.query.results_iter():
             if fill_cache:
-                obj, aggregate_start = get_cached_row(self.model, row,
-                                    index_start, max_depth, requested=requested)
+                obj, _ = get_cached_row(self.model, row,
+                            index_start, max_depth,
+                            requested=requested, offset=len(aggregate_select))
             else:
                 # omit aggregates in object creation
                 obj = self.model(*row[index_start:aggregate_start])
@@ -306,11 +307,13 @@ class QuerySet(object):
         for arg in args:
             kwargs[arg.default_alias] = arg
 
+        query = self.query.clone()
+
         for (alias, aggregate_expr) in kwargs.items():
-            self.query.add_aggregate(aggregate_expr, self.model, alias,
+            query.add_aggregate(aggregate_expr, self.model, alias,
                 is_summary=True)
 
-        return self.query.get_aggregation()
+        return query.get_aggregation()
 
     def count(self):
         """
@@ -695,7 +698,7 @@ class QuerySet(object):
         Prepare the query for computing a result that contains aggregate annotations.
         """
         opts = self.model._meta
-        if not self.query.group_by:
+        if self.query.group_by is None:
             field_names = [f.attname for f in opts.fields]
             self.query.add_fields(field_names, False)
             self.query.set_group_by()
@@ -724,11 +727,15 @@ class ValuesQuerySet(QuerySet):
         # names of the model fields to select.
 
     def iterator(self):
-        if (not self.extra_names and
-            len(self.field_names) != len(self.model._meta.fields)):
+        # Purge any extra columns that haven't been explicitly asked for
+        if self.extra_names is not None:
             self.query.trim_extra_select(self.extra_names)
-        names = self.query.extra_select.keys() + self.field_names
-        names.extend(self.query.aggregate_select.keys())
+
+        extra_names = self.query.extra_select.keys()
+        field_names = self.field_names
+        aggregate_names = self.query.aggregate_select.keys()
+
+        names = extra_names + field_names + aggregate_names
 
         for row in self.query.results_iter():
             yield dict(zip(names, row))
@@ -742,29 +749,30 @@ class ValuesQuerySet(QuerySet):
         instance.
         """
         self.query.clear_select_fields()
-        self.extra_names = []
-        self.aggregate_names = []
 
         if self._fields:
+            self.extra_names = []
+            self.aggregate_names = []
             if not self.query.extra_select and not self.query.aggregate_select:
-                field_names = list(self._fields)
+                self.field_names = list(self._fields)
             else:
-                field_names = []
+                self.query.default_cols = False
+                self.field_names = []
                 for f in self._fields:
                     if self.query.extra_select.has_key(f):
                         self.extra_names.append(f)
                     elif self.query.aggregate_select.has_key(f):
                         self.aggregate_names.append(f)
                     else:
-                        field_names.append(f)
+                        self.field_names.append(f)
         else:
             # Default to all fields.
-            field_names = [f.attname for f in self.model._meta.fields]
+            self.extra_names = None
+            self.field_names = [f.attname for f in self.model._meta.fields]
+            self.aggregate_names = None
 
         self.query.select = []
-        self.query.add_fields(field_names, False)
-        self.query.default_cols = False
-        self.field_names = field_names
+        self.query.add_fields(self.field_names, False)
 
     def _clone(self, klass=None, setup=False, **kwargs):
         """
@@ -814,7 +822,8 @@ class ValuesQuerySet(QuerySet):
 
 class ValuesListQuerySet(ValuesQuerySet):
     def iterator(self):
-        self.query.trim_extra_select(self.extra_names)
+        if self.extra_names is not None:
+            self.query.trim_extra_select(self.extra_names)
         if self.flat and len(self._fields) == 1:
             for row in self.query.results_iter():
                 yield row[0]
@@ -822,13 +831,24 @@ class ValuesListQuerySet(ValuesQuerySet):
             for row in self.query.results_iter():
                 yield tuple(row)
         else:
-            # When extra(select=...) is involved, the extra cols come are
-            # always at the start of the row, so we need to reorder the fields
+            # When extra(select=...) or an annotation is involved, the extra cols are
+            # always at the start of the row, and we need to reorder the fields
             # to match the order in self._fields.
-            names = self.query.extra_select.keys() + self.field_names + self.query.aggregate_select.keys()
+            extra_names = self.query.extra_select.keys()
+            field_names = self.field_names
+            aggregate_names = self.query.aggregate_select.keys()
+            names = extra_names + field_names + aggregate_names
+
+            # If a field list has been specified, use it. Otherwise, use the
+            # full list of fields, including extras and aggregates.
+            if self._fields:
+                fields = self._fields
+            else:
+                fields = names
+
             for row in self.query.results_iter():
                 data = dict(zip(names, row))
-                yield tuple([data[f] for f in self._fields])
+                yield tuple([data[f] for f in fields])
 
     def _clone(self, *args, **kwargs):
         clone = super(ValuesListQuerySet, self)._clone(*args, **kwargs)
@@ -898,7 +918,7 @@ class EmptyQuerySet(QuerySet):
 
 
 def get_cached_row(klass, row, index_start, max_depth=0, cur_depth=0,
-                   requested=None):
+                   requested=None, offset=0):
     """
     Helper function that recursively returns an object with the specified
     related attributes already populated.
@@ -915,6 +935,7 @@ def get_cached_row(klass, row, index_start, max_depth=0, cur_depth=0,
         obj = None
     else:
         obj = klass(*fields)
+    index_end += offset
     for f in klass._meta.fields:
         if not select_related_descend(f, restricted, requested):
             continue

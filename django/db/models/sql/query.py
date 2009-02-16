@@ -18,6 +18,7 @@ from django.db.models import signals
 from django.db.models.fields import FieldDoesNotExist
 from django.db.models.query_utils import select_related_descend
 from django.db.models.sql import aggregates as base_aggregates_module
+from django.db.models.sql.expressions import SQLEvaluator
 from django.db.models.sql.where import WhereNode, Constraint, EverythingNode, AND, OR
 from django.core.exceptions import FieldError
 from datastructures import EmptyResultSet, Empty, MultiJoin
@@ -67,7 +68,7 @@ class BaseQuery(object):
         self.tables = []    # Aliases in the order they are created.
         self.where = where()
         self.where_class = where
-        self.group_by = []
+        self.group_by = None
         self.having = where()
         self.order_by = []
         self.low_mark, self.high_mark = 0, None  # Used for offset/limit
@@ -176,7 +177,10 @@ class BaseQuery(object):
         obj.tables = self.tables[:]
         obj.where = deepcopy(self.where)
         obj.where_class = self.where_class
-        obj.group_by = self.group_by[:]
+        if self.group_by is None:
+            obj.group_by = None
+        else:
+            obj.group_by = self.group_by[:]
         obj.having = deepcopy(self.having)
         obj.order_by = self.order_by[:]
         obj.low_mark, obj.high_mark = self.low_mark, self.high_mark
@@ -217,6 +221,8 @@ class BaseQuery(object):
         to return Decimal and long types when they are not needed.
         """
         if value is None:
+            if aggregate.is_ordinal:
+                return 0
             # Return None as-is
             return value
         elif aggregate.is_ordinal:
@@ -269,7 +275,7 @@ class BaseQuery(object):
         # If there is a group by clause, aggregating does not add useful
         # information but retrieves only the first row. Aggregate
         # over the subquery instead.
-        if self.group_by:
+        if self.group_by is not None:
             from subqueries import AggregateQuery
             query = AggregateQuery(self.model, self.connection)
 
@@ -295,10 +301,14 @@ class BaseQuery(object):
         query.related_select_cols = []
         query.related_select_fields = []
 
+        result = query.execute_sql(SINGLE)
+        if result is None:
+            result = [None for q in query.aggregate_select.items()]
+
         return dict([
             (alias, self.resolve_aggregate(val, aggregate))
             for (alias, aggregate), val
-            in zip(query.aggregate_select.items(), query.execute_sql(SINGLE))
+            in zip(query.aggregate_select.items(), result)
         ])
 
     def get_count(self):
@@ -340,7 +350,7 @@ class BaseQuery(object):
         """
         self.pre_sql_setup()
         out_cols = self.get_columns(with_col_aliases)
-        ordering = self.get_ordering()
+        ordering, ordering_group_by = self.get_ordering()
 
         # This must come after 'select' and 'ordering' -- see docstring of
         # get_from_clause() for details.
@@ -372,11 +382,18 @@ class BaseQuery(object):
                 result.append('AND')
             result.append(' AND '.join(self.extra_where))
 
-        if self.group_by:
-            grouping = self.get_grouping()
-            result.append('GROUP BY %s' % ', '.join(grouping))
-            if not ordering:
+        grouping = self.get_grouping()
+        if grouping:
+            if ordering:
+                # If the backend can't group by PK (i.e., any database
+                # other than MySQL), then any fields mentioned in the
+                # ordering clause needs to be in the group by clause.
+                if not self.connection.features.allows_group_by_pk:
+                    grouping.extend([str(col) for col in ordering_group_by
+                        if col not in grouping])
+            else:
                 ordering = self.connection.ops.force_no_ordering()
+            result.append('GROUP BY %s' % ', '.join(grouping))
 
         if having:
             result.append('HAVING %s' % having)
@@ -684,18 +701,23 @@ class BaseQuery(object):
         """
         qn = self.quote_name_unless_alias
         result = []
-        for col in self.group_by:
-            if isinstance(col, (list, tuple)):
-                result.append('%s.%s' % (qn(col[0]), qn(col[1])))
-            elif hasattr(col, 'as_sql'):
-                result.append(col.as_sql(qn))
-            else:
-                result.append(str(col))
+        if self.group_by is not None:
+            group_by = self.group_by or []
+            for col in group_by + self.related_select_cols + self.extra_select.keys():
+                if isinstance(col, (list, tuple)):
+                    result.append('%s.%s' % (qn(col[0]), qn(col[1])))
+                elif hasattr(col, 'as_sql'):
+                    result.append(col.as_sql(qn))
+                else:
+                    result.append(str(col))
         return result
 
     def get_ordering(self):
         """
-        Returns list representing the SQL elements in the "order by" clause.
+        Returns a tuple containing a list representing the SQL elements in the
+        "order by" clause, and the list of SQL elements that need to be added
+        to the GROUP BY clause as a result of the ordering.
+
         Also sets the ordering_aliases attribute on this instance to a list of
         extra aliases needed in the select.
 
@@ -713,6 +735,7 @@ class BaseQuery(object):
         distinct = self.distinct
         select_aliases = self._select_aliases
         result = []
+        group_by = []
         ordering_aliases = []
         if self.standard_ordering:
             asc, desc = ORDER_DIR['ASC']
@@ -735,6 +758,7 @@ class BaseQuery(object):
                 else:
                     order = asc
                 result.append('%s %s' % (field, order))
+                group_by.append(field)
                 continue
             col, order = get_order_dir(field, asc)
             if col in self.aggregate_select:
@@ -749,6 +773,7 @@ class BaseQuery(object):
                     processed_pairs.add((table, col))
                     if not distinct or elt in select_aliases:
                         result.append('%s %s' % (elt, order))
+                        group_by.append(elt)
             elif get_order_dir(field)[0] not in self.extra_select:
                 # 'col' is of the form 'field' or 'field1__field2' or
                 # '-field1__field2__field', etc.
@@ -760,13 +785,15 @@ class BaseQuery(object):
                         if distinct and elt not in select_aliases:
                             ordering_aliases.append(elt)
                         result.append('%s %s' % (elt, order))
+                        group_by.append(elt)
             else:
                 elt = qn2(col)
                 if distinct and col not in select_aliases:
                     ordering_aliases.append(elt)
                 result.append('%s %s' % (elt, order))
+                group_by.append(elt)
         self.ordering_aliases = ordering_aliases
-        return result
+        return result, group_by
 
     def find_ordering_name(self, name, opts, alias=None, default_order='ASC',
             already_seen=None):
@@ -1202,7 +1229,7 @@ class BaseQuery(object):
             # Aggregate references a normal field
             field_name = field_list[0]
             source = opts.get_field(field_name)
-            if not (self.group_by and is_summary):
+            if not (self.group_by is not None and is_summary):
                 # Only use a column alias if this is a
                 # standalone aggregate, or an annotation
                 col = (opts.db_table, source.column)
@@ -1250,6 +1277,10 @@ class BaseQuery(object):
         else:
             lookup_type = parts.pop()
 
+        # By default, this is a WHERE clause. If an aggregate is referenced
+        # in the value, the filter will be promoted to a HAVING
+        having_clause = False
+
         # Interpret '__exact=None' as the sql 'is NULL'; otherwise, reject all
         # uses of None as a query value.
         if value is None:
@@ -1263,10 +1294,18 @@ class BaseQuery(object):
             value = True
         elif callable(value):
             value = value()
+        elif hasattr(value, 'evaluate'):
+            # If value is a query expression, evaluate it
+            value = SQLEvaluator(value, self)
+            having_clause = value.contains_aggregate
 
         for alias, aggregate in self.aggregate_select.items():
             if alias == parts[0]:
-                self.having.add((aggregate, lookup_type, value), AND)
+                entry = self.where_class()
+                entry.add((aggregate, lookup_type, value), AND)
+                if negate:
+                    entry.negate()
+                self.having.add(entry, AND)
                 return
 
         opts = self.get_meta()
@@ -1315,8 +1354,13 @@ class BaseQuery(object):
             self.promote_alias_chain(join_it, join_promote)
             self.promote_alias_chain(table_it, table_promote)
 
-        self.where.add((Constraint(alias, col, field), lookup_type, value),
-            connector)
+
+        if having_clause:
+            self.having.add((Constraint(alias, col, field), lookup_type, value),
+                connector)
+        else:
+            self.where.add((Constraint(alias, col, field), lookup_type, value),
+                connector)
 
         if negate:
             self.promote_alias_chain(join_list)
@@ -1777,6 +1821,7 @@ class BaseQuery(object):
         primary key, and the query would be equivalent, the optimization
         will be made automatically.
         """
+        self.group_by = []
         if self.connection.features.allows_group_by_pk:
             if len(self.select) == len(self.model._meta.fields):
                 self.group_by.append('.'.join([self.model._meta.db_table,

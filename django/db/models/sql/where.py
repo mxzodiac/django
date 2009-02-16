@@ -97,6 +97,7 @@ class WhereNode(tree.Node):
                 else:
                     # A leaf node in the tree.
                     sql, params = self.make_atom(child, qn)
+
             except EmptyResultSet:
                 if self.connector == AND and not self.negated:
                     # We can bail out early in this particular case (only).
@@ -114,6 +115,7 @@ class WhereNode(tree.Node):
                 if self.negated:
                     empty = True
                 continue
+
             empty = False
             if sql:
                 result.append(sql)
@@ -151,16 +153,17 @@ class WhereNode(tree.Node):
         else:
             cast_sql = '%s'
 
-        if isinstance(params, QueryWrapper):
-            extra, params = params.data
+        if hasattr(params, 'as_sql'):
+            extra, params = params.as_sql(qn)
+            cast_sql = ''
         else:
             extra = ''
 
         if lookup_type in connection.operators:
-            format = "%s %%s %s" % (connection.ops.lookup_cast(lookup_type),
-                    extra)
+            format = "%s %%s %%s" % (connection.ops.lookup_cast(lookup_type),)
             return (format % (field_sql,
-                    connection.operators[lookup_type] % cast_sql), params)
+                              connection.operators[lookup_type] % cast_sql,
+                              extra), params)
 
         if lookup_type == 'in':
             if not value_annot:
@@ -171,9 +174,9 @@ class WhereNode(tree.Node):
                     params)
         elif lookup_type in ('range', 'year'):
             return ('%s BETWEEN %%s and %%s' % field_sql, params)
-        elif lookup_type in ('month', 'day'):
-            return ('%s = %%s' % connection.ops.date_extract_sql(lookup_type,
-                    field_sql), params)
+        elif lookup_type in ('month', 'day', 'week_day'):
+            return ('%s = %%s' % connection.ops.date_extract_sql(lookup_type, field_sql),
+                    params)
         elif lookup_type == 'isnull':
             return ('%s IS %sNULL' % (field_sql,
                 (not value_annot and 'NOT ' or '')), ())
@@ -214,6 +217,9 @@ class WhereNode(tree.Node):
                 if elt[0] in change_map:
                     elt[0] = change_map[elt[0]]
                     node.children[pos] = (tuple(elt),) + child[1:]
+                # Check if the query value also requires relabelling
+                if hasattr(child[3], 'relabel_aliases'):
+                    child[3].relabel_aliases(change_map)
 
 class EverythingNode(object):
     """
