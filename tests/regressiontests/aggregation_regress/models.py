@@ -91,7 +91,7 @@ __test__ = {'API_TESTS': """
 >>> sorted(Book.objects.all().annotate(mean_auth_age=Avg('authors__age')).extra(select={'manufacture_cost' : 'price * .5'}).values().get(pk=2).items())
 [('contact_id', 3), ('id', 2), ('isbn', u'067232959'), ('manufacture_cost', ...11.545...), ('mean_auth_age', 45.0), ('name', u'Sams Teach Yourself Django in 24 Hours'), ('pages', 528), ('price', Decimal("23.09")), ('pubdate', datetime.date(2008, 3, 3)), ('publisher_id', 2), ('rating', 3.0)]
 
-# The order of the values, annotate and extra clauses doesn't matter
+# The order of the (empty) values, annotate and extra clauses doesn't matter
 >>> sorted(Book.objects.all().values().annotate(mean_auth_age=Avg('authors__age')).extra(select={'manufacture_cost' : 'price * .5'}).get(pk=2).items())
 [('contact_id', 3), ('id', 2), ('isbn', u'067232959'), ('manufacture_cost', ...11.545...), ('mean_auth_age', 45.0), ('name', u'Sams Teach Yourself Django in 24 Hours'), ('pages', 528), ('price', Decimal("23.09")), ('pubdate', datetime.date(2008, 3, 3)), ('publisher_id', 2), ('rating', 3.0)]
 
@@ -200,11 +200,22 @@ FieldError: Cannot resolve keyword 'foo' into field. Choices are: authors, conta
 >>> sorted([(b.name, b.authors__age__avg, b.publisher.name, b.contact.name) for b in books])
 [(u'Artificial Intelligence: A Modern Approach', 51.5, u'Prentice Hall', u'Peter Norvig'), (u'Practical Django Projects', 29.0, u'Apress', u'James Bennett'), (u'Python Web Development with Django', 30.3..., u'Prentice Hall', u'Jeffrey Forcier'), (u'Sams Teach Yourself Django in 24 Hours', 45.0, u'Sams', u'Brad Dayley')]
 
+# Regression for #10132 - If the values() clause only mentioned extra(select=) columns, those columns are used for grouping
+>>> Book.objects.extra(select={'pub':'publisher_id'}).values('pub').annotate(Count('id')).order_by('pub')
+[{'pub': 1, 'id__count': 2}, {'pub': 2, 'id__count': 1}, {'pub': 3, 'id__count': 2}, {'pub': 4, 'id__count': 1}]
+
+>>> Book.objects.extra(select={'pub':'publisher_id','foo':'pages'}).values('pub').annotate(Count('id')).order_by('pub')
+[{'pub': 1, 'id__count': 2}, {'pub': 2, 'id__count': 1}, {'pub': 3, 'id__count': 2}, {'pub': 4, 'id__count': 1}]
+
 # Regression for #10199 - Aggregate calls clone the original query so the original query can still be used
 >>> books = Book.objects.all()
 >>> _ = books.aggregate(Avg('authors__age'))
 >>> books.all()
 [<Book: Artificial Intelligence: A Modern Approach>, <Book: Paradigms of Artificial Intelligence Programming: Case Studies in Common Lisp>, <Book: Practical Django Projects>, <Book: Python Web Development with Django>, <Book: Sams Teach Yourself Django in 24 Hours>, <Book: The Definitive Guide to Django: Web Development Done Right>]
+
+# Regression for #10248 - Annotations work with DateQuerySets
+>>> Book.objects.annotate(num_authors=Count('authors')).filter(num_authors=2).dates('pubdate', 'day')
+[datetime.datetime(1995, 1, 15, 0, 0), datetime.datetime(2007, 12, 6, 0, 0)]
 
 """
 }

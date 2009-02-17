@@ -132,7 +132,7 @@ class FileDescriptor(object):
             # have the FieldFile interface added to them
             file_copy = copy.copy(file)
             file_copy.__class__ = type(file.__class__.__name__, 
-                                       (file.__class__, FieldFile), {})
+                                       (file.__class__, self.field.attr_class), {})
             file_copy.instance = instance
             file_copy.field = self.field
             file_copy.storage = self.field.storage
@@ -212,6 +212,10 @@ class FileField(Field):
 
     def generate_filename(self, instance, filename):
         return os.path.join(self.get_directory_name(), self.get_filename(filename))
+
+    def save_form_data(self, instance, data):
+        if data:
+            setattr(instance, self.name, data)
 
     def formfield(self, **kwargs):
         defaults = {'form_class': forms.FileField}
