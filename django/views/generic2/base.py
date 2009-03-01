@@ -1,41 +1,4 @@
 from django.core.exceptions import ImproperlyConfigured
-
-class Option(object):
-    """
-    An "option" for a generic view that may be filled by an attribute or a
-    function. Really just a marker for the metaclass and a placeholder for the
-    default values.
-    """
-    def __init__(self, default=None):
-        self.default = default
-        
-        # Filled in by the metaclass
-        self.name = None
-
-class OptionsMetaclass(type):
-    """
-    Metaclass that supports the definition of configuration options by
-    swizziling any ``GenericViewOption`` attributes into an ``__options__``
-    dictionary.
-    """    
-    def __new__(cls, name, bases, attrs):        
-        # Gather options set by any parent classes.
-        options = {}
-        for parent in bases:
-            options.update(getattr(parent, '__options__', {})
-            
-        # If any attributes on the class are options, add them to the dict of
-        # options and remove them from the list of attrs for this class.
-        for attr, value in attrs.items():
-            if isinstance(value, GenericViewOption):
-                option = attrs.pop(attr)
-                option.name = attr
-                options[option.name] = option
-                
-        # Save the options as cls.__options__
-        attrs['__options__'] = options
-        
-        return super(OptionsMetaclass, cls).__new__(cls, name, bases, attrs)
     
 class GenericView(object):
     """
@@ -43,74 +6,61 @@ class GenericView(object):
     as attributes, and also defines the options and defaults shared by all
     generic views.
     """
-    __metaclass__ = OptionsMetaclass
-    
-    # Options that all generic views take
-    context_processors   = Option()
-    mimetype             = Option(default="text/html")
-    template_loader      = Option()
-    template_name        = Option()
-    
-    def __getattribute__(self, name):
-        # Remember: we can't use ``object.whatever`` in here; that'll lead to
-        # an infinite loop. We must use the parent classes' __getattribute__
-        superget = super(GenericView, self).__getattribute__
-        options = superget('__options__')
         
-        # We only want to handle options.
-        if name not in options:
-            return superget(name)
-                
-        # Try to get a value from this class, and fall back on # the default.
-        try:
-            value = superget(options[name])
-        except AttributeError:
-            value = options[name].default
-
-        # If this is a callable, return it. Otherwise, convert the attribute
-        # into a callable by calling self.__wrap__.
-        if callable(value):
-            return value
-        else:
-            return superget('__wrap__')(value)
-            
-    def __wrap__(self, value):
+    def __init__(self, **kwargs):
+        self.context_processors = kwargs.pop('context_processors', None)
+        self.mimetype = kwargs.pop('mimetype', 'text/html')
+        self.template_loader = kwargs.pop('template_loader', None)
+        self.template_name = kwargs.pop('template_name', None)
+        if kwargs:
+            badkey = kwargs.iterkeys.next()
+            raise TypeError("__init__() got an unexpected keyword argument '%s'" % badkey)
+    
+    def get_context_processors(self, request, obj):
         """
-        The default wrapper function. The signature of most generic view option
-        callbacks is (request, some_object).
+        Get the context processors to be used for the given request.
         """
-        return lambda request, obj: value
-        
+        return self.context_processors or None
+    
+    def get_mimetype(self, request, obj):
+        """
+        Get the mimetype to be used for the given request.
+        """
+        return self.mimetype or "text/html"
+                                
     def get_template(self, request, obj):
         """
-        Get a Template object for the given request.
+        Get a ``Template`` object for the given request.
         """
         names = self.get_template_names(request, obj)
         if not names:
             raise ImproperlyConfigured("'%s' must provide template_name." % self.__class__.__name__)
         return self.load_template(request, obj, names)
 
-    def get_template_names(self, request, obj):
+    def get_template_loader(self, request, obj):
+        """
+        Get the template loader to be used for this request. Defaults to 
+        ``django.template.loader``.
+        """
+        import django.template.loader
+        return self.template_loader or django.template.loader
+
+    def get_template_name(self, request, obj):
         """
         Return a list of template names to be used for the request. Must return
         a list. May not be called if get_template is overridden.
-        """                        
-        # Try self.template_name; it could be a string or list.
-        names = self.template_name(request, obj)
-        if names is None:
-            return []
-        elif isinstance(tns, basestring):
-            return [names]
+        """ 
+        if self.template_name is None:
+            return []                       
+        elif isinstance(self.template_name, basestring):
+            return [self.template_name]
         else:
-            return names
             
-    def load_template(self, request, obj, names):
+    def load_template(self, request, obj, names=[]):
         """
         Load a template, using self.template_loader or the default.
         """
-        import django.template.loader
-        loader = self.template_loader(request, obj) or django.template.loader
-        return loader.select_template(names)
+        return self.get_template_loader(request, obj).select_template(names)
         
     def get_context(self, request, obj):
         """
@@ -125,39 +75,59 @@ class ListView(GenericView):
     for that see ModelListView.
     """
     
-    items                = Option()
-    paginate_by          = Option()
-    allow_empty          = Option(default=True)
-    template_object_name = Option(default='object')
+    paginate_by          = None
+    allow_empty          = True
+    template_object_name = None
     
     def __call__(self, request, page=None):
-        paginator, page items = self.get_items(request, page)
+        paginator, page, items = self.get_items(request, page)
         template = self.get_template(request, items)
         context = self.get_context(request, items, paginator, page)
-        mimetype = self.mimetype(request, items)
-        return HttpResponse(template.render(context), mimetype=mimetype)
+        mimetype = self.get_mimetype(request, items)
+        response = HttpResponse(template.render(context), mimetype=mimetype)
+        response = self.process_response(response)
+        return response
 
     def get_items(self, request, page):
         """
-        Get the list of items for this view.
+        Get the list of items for this view. This must be an interable, and may
+        be a queryset (in which qs-specific behavior will be enabled).
         """
-        items = self.items(request, None)
-        if items is None:
-            raise ImproperlyConfigured("'%s' must define 'items'" % self.__class__.__name__)
-        return self.paginate_items(request, items, page))
-            
+        if hasattr(self, 'queryset') and self.queryset is not None:
+            items = self.queryset._clone()
+        elif hasattr(self, 'items') and self.items is not None:
+            items = self.items
+        else:
+            raise ImproperlyConfigured("'%s' must define 'queryset' or 'items'" \
+                                            % self.__class__.__name__)
+        
+        return self.paginate_items(request, items, page)
+
+    def get_paginate_by(self, request, items):
+        """
+        Get the number of items to paginate by, or ``None`` for no pagination.
+        """
+        return self.paginate_by or None
+        
+    def get_allow_empty(self, request, items):
+        """
+        Returns ``True`` if the view should display empty lists, and ``False``
+        if a 404 should be raised instead.
+        """
+        return self.allow_empty or True
+        
     def paginate_items(self, request, items, page):
         """
         Paginate the list of items, if needed.
         """
-        paginate_by = self.paginate_by(request, items)
-        allow_empty = self.allow_empty(request, items)        
+        paginate_by = self.get_paginate_by(request, items)
+        allow_empty = self.get_allow_empty(request, items)
         if not paginate_by:
             if not allow_empty and len(items) == 0:
                 raise Http404("Empty list and '%s.allow_empty' is False." % self.__class__.__name__)
             return (None, None, items)
         
-        paginator = Paginator(queryset, paginate_by, allow_empty_first_page=allow_empty)
+        paginator = Paginator(items, paginate_by, allow_empty_first_page=allow_empty)
         page = page or request.GET.get('page', 1)
         try:
             page_number = int(page)
@@ -167,7 +137,8 @@ class ListView(GenericView):
             else:
                 raise Http404("Page is not 'last', nor can it be converted to an int.")
         try:
-            return paginator.page(page_number)
+            page = paginator.page(page_number)
+            return (paginator, page, page.object_list)
         except InvalidPage:
             raise Http404('Invalid page (%s)' % page_number)
 
@@ -182,6 +153,8 @@ class ListView(GenericView):
             'page_obj': page,
             'is_paginated':  paginator is not None
         })
+        if getattr(self, 'legacy_context', True):
+            context.update(self._get_legacy_paginated_context(paginator, page))
         return context
         
     def _get_legacy_paginated_context(self, paginator, page):
