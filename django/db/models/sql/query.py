@@ -345,7 +345,7 @@ class BaseQuery(object):
         # in SQL (in variants that provide them) doesn't change the COUNT
         # output.
         number = max(0, number - self.low_mark)
-        if self.high_mark:
+        if self.high_mark is not None:
             number = min(number, self.high_mark - self.low_mark)
 
         return number
@@ -392,18 +392,21 @@ class BaseQuery(object):
                 result.append('AND')
             result.append(' AND '.join(self.extra_where))
 
-        grouping = self.get_grouping()
+        grouping, gb_params = self.get_grouping()
         if grouping:
             if ordering:
                 # If the backend can't group by PK (i.e., any database
                 # other than MySQL), then any fields mentioned in the
                 # ordering clause needs to be in the group by clause.
                 if not self.connection.features.allows_group_by_pk:
-                    grouping.extend([str(col) for col in ordering_group_by
-                        if col not in grouping])
+                    for col, col_params in ordering_group_by:
+                        if col not in grouping:
+                            grouping.append(str(col))
+                            gb_params.extend(col_params)
             else:
                 ordering = self.connection.ops.force_no_ordering()
             result.append('GROUP BY %s' % ', '.join(grouping))
+            params.extend(gb_params)
 
         if having:
             result.append('HAVING %s' % having)
@@ -710,17 +713,22 @@ class BaseQuery(object):
         Returns a tuple representing the SQL elements in the "group by" clause.
         """
         qn = self.quote_name_unless_alias
-        result = []
+        result, params = [], []
         if self.group_by is not None:
             group_by = self.group_by or []
-            for col in group_by + self.related_select_cols + self.extra_select.keys():
+
+            extra_selects = []
+            for extra_select, extra_params in self.extra_select.itervalues():
+                extra_selects.append(extra_select)
+                params.extend(extra_params)
+            for col in group_by + self.related_select_cols + extra_selects:
                 if isinstance(col, (list, tuple)):
                     result.append('%s.%s' % (qn(col[0]), qn(col[1])))
                 elif hasattr(col, 'as_sql'):
                     result.append(col.as_sql(qn))
                 else:
                     result.append(str(col))
-        return result
+        return result, params
 
     def get_ordering(self):
         """
@@ -768,7 +776,7 @@ class BaseQuery(object):
                 else:
                     order = asc
                 result.append('%s %s' % (field, order))
-                group_by.append(field)
+                group_by.append((field, []))
                 continue
             col, order = get_order_dir(field, asc)
             if col in self.aggregate_select:
@@ -783,7 +791,7 @@ class BaseQuery(object):
                     processed_pairs.add((table, col))
                     if not distinct or elt in select_aliases:
                         result.append('%s %s' % (elt, order))
-                        group_by.append(elt)
+                        group_by.append((elt, []))
             elif get_order_dir(field)[0] not in self.extra_select:
                 # 'col' is of the form 'field' or 'field1__field2' or
                 # '-field1__field2__field', etc.
@@ -795,13 +803,13 @@ class BaseQuery(object):
                         if distinct and elt not in select_aliases:
                             ordering_aliases.append(elt)
                         result.append('%s %s' % (elt, order))
-                        group_by.append(elt)
+                        group_by.append((elt, []))
             else:
                 elt = qn2(col)
                 if distinct and col not in select_aliases:
                     ordering_aliases.append(elt)
                 result.append('%s %s' % (elt, order))
-                group_by.append(elt)
+                group_by.append(self.extra_select[col])
         self.ordering_aliases = ordering_aliases
         return result, group_by
 
@@ -826,8 +834,9 @@ class BaseQuery(object):
             # the model.
             self.ref_alias(alias)
 
-        # Must use left outer joins for nullable fields.
-        self.promote_alias_chain(joins)
+        # Must use left outer joins for nullable fields and their relations.
+        self.promote_alias_chain(joins,
+                self.alias_map[joins[0]][JOIN_TYPE] == self.LOUTER)
 
         # If we get to this point and the field is a relation to another model,
         # append the default ordering for that model.
@@ -1751,7 +1760,7 @@ class BaseQuery(object):
 
         Typically, this means no limits or offsets have been put on the results.
         """
-        return not (self.low_mark or self.high_mark)
+        return not self.low_mark and self.high_mark is None
 
     def clear_select_fields(self):
         """
@@ -2003,9 +2012,11 @@ class BaseQuery(object):
         iterator over the results if the result_type is MULTI.
 
         result_type is either MULTI (use fetchmany() to retrieve all rows),
-        SINGLE (only retrieve a single row), or None (no results expected, but
-        the cursor is returned, since it's used by subclasses such as
-        InsertQuery).
+        SINGLE (only retrieve a single row), or None. In this last case, the
+        cursor is returned if any query is executed, since it's used by
+        subclasses such as InsertQuery). It's possible, however, that no query
+        is needed, as the filters describe an empty set. In that case, None is
+        returned, to avoid any unnecessary database interaction.
         """
         try:
             sql, params = self.as_sql()
