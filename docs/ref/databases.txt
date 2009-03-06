@@ -366,10 +366,15 @@ version of SQLite.
 Oracle notes
 ============
 
-Django supports `Oracle Database Server`_ versions 9i and higher. Oracle
-version 10g or later is required to use Django's ``regex`` and ``iregex`` query
-operators. You will also need a 4.X release of the `cx_Oracle`_ driver,
-version 4.3.1 or newer.
+Django supports `Oracle Database Server`_ versions 9i and
+higher. Oracle version 10g or later is required to use Django's
+``regex`` and ``iregex`` query operators. You will also need at least
+version 4.3.1 of the `cx_Oracle`_ Python driver.
+
+Note that due to a Unicode-corruption bug in ``cx_Oracle`` 5.0, that
+version of the driver should **not** be used with Django;
+``cx_Oracle`` 5.0.1 resolved this issue, so if you'd like to use a
+more recent ``cx_Oracle``, use version 5.0.1.
 
 .. _`Oracle Database Server`: http://www.oracle.com/
 .. _`cx_Oracle`: http://cx-oracle.sourceforge.net/
@@ -470,12 +475,13 @@ characters of the truncated name with a repeatable MD5 hash value.
 NULL and empty strings
 ----------------------
 
-Django generally prefers to use the empty string ('') rather than NULL, but
-Oracle treats both identically. To get around this, the Oracle backend
-coerces the ``null=True`` option on fields that permit the empty string as a
-value. When fetching from the database, it is assumed that a NULL value in
-one of these fields really means the empty string, and the data is silently
-converted to reflect this assumption.
+Django generally prefers to use the empty string ('') rather than
+NULL, but Oracle treats both identically. To get around this, the
+Oracle backend coerces the ``null=True`` option on fields that have
+the empty string as a possible value. When fetching from the database,
+it is assumed that a NULL value in one of these fields really means
+the empty string, and the data is silently converted to reflect this
+assumption.
 
 ``TextField`` limitations
 -------------------------
