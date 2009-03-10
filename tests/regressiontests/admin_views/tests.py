@@ -11,16 +11,13 @@ from django.contrib.admin.util import quote
 from django.utils.html import escape
 
 # local test models
-<<<<<<< HEAD:tests/regressiontests/admin_views/tests.py
-from models import Article, CustomArticle, Section, ModelWithStringPrimaryKey, Person
-=======
-from models import Article, CustomArticle, Section, ModelWithStringPrimaryKey, Persona, FooAccount, BarAccount
+from models import Article, CustomArticle, Section, ModelWithStringPrimaryKey, Person, Persona, FooAccount, BarAccount
 
 try:
     set
 except NameError:
     from sets import Set as set
->>>>>>> master:tests/regressiontests/admin_views/tests.py
+
 
 class AdminViewBasicTest(TestCase):
     fixtures = ['admin-views-users.xml', 'admin-views-colors.xml']
@@ -733,7 +730,7 @@ class AdminViewUnicodeTest(TestCase):
         response = self.client.post('/test_admin/admin/admin_views/book/1/delete/', delete_dict)
         self.assertRedirects(response, '/test_admin/admin/admin_views/book/')
 
-<<<<<<< HEAD:tests/regressiontests/admin_views/tests.py
+
 class AdminViewListEditable(TestCase):
     fixtures = ['admin-views-users.xml', 'admin-views-person.xml']
     

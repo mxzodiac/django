@@ -134,7 +134,6 @@ class Thing(models.Model):
 class ThingAdmin(admin.ModelAdmin):
     list_filter = ('color',)
 
-<<<<<<< HEAD:tests/regressiontests/admin_views/models.py
 class Person(models.Model):
     GENDER_CHOICES = (
         (1, "Male"),
@@ -151,7 +150,7 @@ class PersonAdmin(admin.ModelAdmin):
     list_display = ('name', 'gender', 'alive')
     list_editable = ('gender', 'alive')
     ordering = ["id"]
-=======
+
 class Persona(models.Model):
     """
     A simple persona associated with accounts, to test inlining of related
@@ -194,7 +193,7 @@ class PersonaAdmin(admin.ModelAdmin):
         FooAccountAdmin,
         BarAccountAdmin
     )
->>>>>>> master:tests/regressiontests/admin_views/models.py
+
 
 admin.site.register(Article, ArticleAdmin)
 admin.site.register(CustomArticle, CustomArticleAdmin)
@@ -202,11 +201,8 @@ admin.site.register(Section, inlines=[ArticleInline])
 admin.site.register(ModelWithStringPrimaryKey)
 admin.site.register(Color)
 admin.site.register(Thing, ThingAdmin)
-<<<<<<< HEAD:tests/regressiontests/admin_views/models.py
 admin.site.register(Person, PersonAdmin)
-=======
 admin.site.register(Persona, PersonaAdmin)
->>>>>>> master:tests/regressiontests/admin_views/models.py
 
 # We intentionally register Promo and ChapterXtra1 but not Chapter nor ChapterXtra2.
 # That way we cover all four cases:
