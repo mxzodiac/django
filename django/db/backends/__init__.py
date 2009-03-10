@@ -217,8 +217,7 @@ class BaseDatabaseOperations(object):
         Returns the value to use for the LIMIT when we are wanting "LIMIT
         infinity". Returns None if the limit clause can be omitted in this case.
         """
-        # FIXME: API may need to change once Oracle backend is repaired.
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def pk_default_value(self):
         """
@@ -450,6 +449,8 @@ class BaseDatabaseIntrospection(object):
         tables = set()
         for app in models.get_apps():
             for model in models.get_models(app):
+                if not model._meta.managed:
+                    continue
                 tables.add(model._meta.db_table)
                 tables.update([f.m2m_db_table() for f in model._meta.local_many_to_many])
         if only_existing:
@@ -476,6 +477,8 @@ class BaseDatabaseIntrospection(object):
 
         for app in apps:
             for model in models.get_models(app):
+                if not model._meta.managed:
+                    continue
                 for f in model._meta.local_fields:
                     if isinstance(f, models.AutoField):
                         sequence_list.append({'table': model._meta.db_table, 'column': f.column})

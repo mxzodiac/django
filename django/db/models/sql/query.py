@@ -62,6 +62,7 @@ class BaseQuery(object):
         self.dupe_avoidance = {}
         self.used_aliases = set()
         self.filter_is_sticky = False
+        self.included_inherited_models = {}
 
         # SQL-related attributes
         self.select = []
@@ -171,6 +172,7 @@ class BaseQuery(object):
         obj.default_cols = self.default_cols
         obj.default_ordering = self.default_ordering
         obj.standard_ordering = self.standard_ordering
+        obj.included_inherited_models = self.included_inherited_models.copy()
         obj.ordering_aliases = []
         obj.select_fields = self.select_fields[:]
         obj.related_select_fields = self.related_select_fields[:]
@@ -304,6 +306,7 @@ class BaseQuery(object):
             self.select = []
             self.default_cols = False
             self.extra_select = {}
+            self.remove_inherited_models()
 
         query.clear_ordering(True)
         query.clear_limits()
@@ -458,6 +461,7 @@ class BaseQuery(object):
         assert self.distinct == rhs.distinct, \
             "Cannot combine a unique query with a non-unique query."
 
+        self.remove_inherited_models()
         # Work out how to relabel the rhs aliases, if necessary.
         change_map = {}
         used = set()
@@ -540,6 +544,9 @@ class BaseQuery(object):
         """
         if not self.tables:
             self.join((None, self.model._meta.db_table, None, None))
+        if (not self.select and self.default_cols and not
+                self.included_inherited_models):
+            self.setup_inherited_models()
         if self.select_related and not self.related_select_cols:
             self.fill_related_selections()
 
@@ -619,7 +626,9 @@ class BaseQuery(object):
             start_alias=None, opts=None, as_pairs=False):
         """
         Computes the default columns for selecting every field in the base
-        model.
+        model. Will sometimes be called to pull in related models (e.g. via
+        select_related), in which case "opts" and "start_alias" will be given
+        to provide a starting point for the traversal.
 
         Returns a list of strings, quoted appropriately for use in SQL
         directly, as well as a set of aliases used in the select statement (if
@@ -629,22 +638,25 @@ class BaseQuery(object):
         result = []
         if opts is None:
             opts = self.model._meta
-        if start_alias:
-            table_alias = start_alias
-        else:
-            table_alias = self.tables[0]
-        root_pk = opts.pk.column
-        seen = {None: table_alias}
         qn = self.quote_name_unless_alias
         qn2 = self.connection.ops.quote_name
         aliases = set()
+        if start_alias:
+            seen = {None: start_alias}
         for field, model in opts.get_fields_with_model():
-            try:
-                alias = seen[model]
-            except KeyError:
-                alias = self.join((table_alias, model._meta.db_table,
-                        root_pk, model._meta.pk.column))
-                seen[model] = alias
+            if start_alias:
+                try:
+                    alias = seen[model]
+                except KeyError:
+                    link_field = opts.get_ancestor_link(model)
+                    alias = self.join((start_alias, model._meta.db_table,
+                            link_field.column, model._meta.pk.column))
+                    seen[model] = alias
+            else:
+                # If we're starting from the base model of the queryset, the
+                # aliases will have already been set up in pre_sql_setup(), so
+                # we can save time here.
+                alias = self.included_inherited_models[model]
             if as_pairs:
                 result.append((alias, field.column))
                 continue
@@ -996,6 +1008,9 @@ class BaseQuery(object):
                 if alias == old_alias:
                     self.tables[pos] = new_alias
                     break
+        for key, alias in self.included_inherited_models.items():
+            if alias in change_map:
+                self.included_inherited_models[key] = change_map[alias]
 
         # 3. Update any joins that refer to the old alias.
         for alias, data in self.alias_map.iteritems():
@@ -1062,9 +1077,11 @@ class BaseQuery(object):
             lhs.lhs_col = table.col
 
         If 'always_create' is True and 'reuse' is None, a new alias is always
-        created, regardless of whether one already exists or not. Otherwise
-        'reuse' must be a set and a new join is created unless one of the
-        aliases in `reuse` can be used.
+        created, regardless of whether one already exists or not. If
+        'always_create' is True and 'reuse' is a set, an alias in 'reuse' that
+        matches the connection will be returned, if possible.  If
+        'always_create' is False, the first existing alias that matches the
+        'connection' is returned, if any. Otherwise a new join is created.
 
         If 'exclusions' is specified, it is something satisfying the container
         protocol ("foo in exclusions" must work) and specifies a list of
@@ -1125,6 +1142,38 @@ class BaseQuery(object):
             self.join_map[t_ident] = (alias,)
         self.rev_join_map[alias] = t_ident
         return alias
+
+    def setup_inherited_models(self):
+        """
+        If the model that is the basis for this QuerySet inherits other models,
+        we need to ensure that those other models have their tables included in
+        the query.
+
+        We do this as a separate step so that subclasses know which
+        tables are going to be active in the query, without needing to compute
+        all the select columns (this method is called from pre_sql_setup(),
+        whereas column determination is a later part, and side-effect, of
+        as_sql()).
+        """
+        opts = self.model._meta
+        root_alias = self.tables[0]
+        seen = {None: root_alias}
+        for field, model in opts.get_fields_with_model():
+            if model not in seen:
+                link_field = opts.get_ancestor_link(model)
+                seen[model] = self.join((root_alias, model._meta.db_table,
+                        link_field.column, model._meta.pk.column))
+        self.included_inherited_models = seen
+
+    def remove_inherited_models(self):
+        """
+        Undoes the effects of setup_inherited_models(). Should be called
+        whenever select columns (self.select) are set explicitly.
+        """
+        for key, alias in self.included_inherited_models.items():
+            if key:
+                self.unref_alias(alias)
+        self.included_inherited_models = {}
 
     def fill_related_selections(self, opts=None, root_alias=None, cur_depth=1,
             used=None, requested=None, restricted=None, nullable=None,
@@ -1238,7 +1287,7 @@ class BaseQuery(object):
                 field_list, opts, self.get_initial_alias(), False)
 
             # Process the join chain to see if it can be trimmed
-            _, _, col, _, join_list = self.trim_joins(source, join_list, last, False)
+            col, _, join_list = self.trim_joins(source, join_list, last, False)
 
             # If the aggregate references a model or field that requires a join,
             # those joins must be LEFT OUTER - empty join rows must be returned
@@ -1343,16 +1392,16 @@ class BaseQuery(object):
                     can_reuse)
             return
 
-        # Process the join chain to see if it can be trimmed
-        final, penultimate, col, alias, join_list = self.trim_joins(target, join_list, last, trim)
-
         if (lookup_type == 'isnull' and value is True and not negate and
-                final > 1):
-            # If the comparison is against NULL, we need to use a left outer
-            # join when connecting to the previous model. We make that
-            # adjustment here. We don't do this unless needed as it's less
-            # efficient at the database level.
-            self.promote_alias(join_list[penultimate])
+                len(join_list) > 1):
+            # If the comparison is against NULL, we may need to use some left
+            # outer joins when creating the join chain. This is only done when
+            # needed, as it's less efficient at the database level.
+            self.promote_alias_chain(join_list)
+
+        # Process the join list to see if we can remove any inner joins from
+        # the far end (fewer tables in a query is better).
+        col, alias, join_list = self.trim_joins(target, join_list, last, trim)
 
         if connector == OR:
             # Some joins may need to be promoted when adding a new filter to a
@@ -1387,7 +1436,7 @@ class BaseQuery(object):
         if negate:
             self.promote_alias_chain(join_list)
             if lookup_type != 'isnull':
-                if final > 1:
+                if len(join_list) > 1:
                     for alias in join_list:
                         if self.alias_map[alias][JOIN_TYPE] == self.LOUTER:
                             j_col = self.alias_map[alias][RHS_JOIN_COL]
@@ -1650,13 +1699,28 @@ class BaseQuery(object):
         return field, target, opts, joins, last, extra_filters
 
     def trim_joins(self, target, join_list, last, trim):
-        """An optimization: if the final join is against the same column as
-        we are comparing against, we can go back one step in a join
-        chain and compare against the LHS of the join instead (and then
-        repeat the optimization). The result, potentially, involves less
-        table joins.
+        """
+        Sometimes joins at the end of a multi-table sequence can be trimmed. If
+        the final join is against the same column as we are comparing against,
+        and is an inner join, we can go back one step in a join chain and
+        compare against the LHS of the join instead (and then repeat the
+        optimization). The result, potentially, involves less table joins.
 
-        Returns a tuple
+        The 'target' parameter is the final field being joined to, 'join_list'
+        is the full list of join aliases.
+
+        The 'last' list contains offsets into 'join_list', corresponding to
+        each component of the filter.  Many-to-many relations, for example, add
+        two tables to the join list and we want to deal with both tables the
+        same way, so 'last' has an entry for the first of the two tables and
+        then the table immediately after the second table, in that case.
+
+        The 'trim' parameter forces the final piece of the join list to be
+        trimmed before anything. See the documentation of add_filter() for
+        details about this.
+
+        Returns the final active column and table alias and the new active
+        join_list.
         """
         final = len(join_list)
         penultimate = last.pop()
@@ -1675,7 +1739,7 @@ class BaseQuery(object):
         alias = join_list[-1]
         while final > 1:
             join = self.alias_map[alias]
-            if col != join[RHS_JOIN_COL]:
+            if col != join[RHS_JOIN_COL] or join[JOIN_TYPE] != self.INNER:
                 break
             self.unref_alias(alias)
             alias = join[LHS_ALIAS]
@@ -1684,7 +1748,7 @@ class BaseQuery(object):
             final -= 1
             if final == penultimate:
                 penultimate = last.pop()
-        return final, penultimate, col, alias, join_list
+        return col, alias, join_list
 
     def update_dupe_avoidance(self, opts, col, alias):
         """
@@ -1803,6 +1867,7 @@ class BaseQuery(object):
             names.sort()
             raise FieldError("Cannot resolve keyword %r into field. "
                     "Choices are: %s" % (name, ", ".join(names)))
+        self.remove_inherited_models()
 
     def add_ordering(self, *ordering):
         """
@@ -2004,6 +2069,7 @@ class BaseQuery(object):
             select_alias = join_info[RHS_ALIAS]
             select_col = join_info[RHS_JOIN_COL]
         self.select = [(select_alias, select_col)]
+        self.remove_inherited_models()
 
     def execute_sql(self, result_type=MULTI):
         """

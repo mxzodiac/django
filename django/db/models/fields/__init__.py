@@ -198,9 +198,9 @@ class Field(object):
             # be invoked before the final SQL is evaluated
             if hasattr(value, 'relabel_aliases'):
                 return value
-            try:
+            if hasattr(value, 'as_sql'):
                 sql, params = value.as_sql()
-            except AttributeError:
+            else:
                 sql, params = value._as_sql()
             return QueryWrapper(('(%s)' % sql), params)
 
@@ -821,6 +821,11 @@ class TimeField(Field):
             return None
         if isinstance(value, datetime.time):
             return value
+        if isinstance(value, datetime.datetime):
+            # Not usually a good idea to pass in a datetime here (it loses
+            # information), but this can be a side-effect of interacting with a
+            # database backend (e.g. Oracle), so we'll be accommodating.
+            return value.time
 
         # Attempt to parse a datetime:
         value = smart_str(value)

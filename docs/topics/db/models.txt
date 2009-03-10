@@ -381,7 +381,7 @@ For these situations, Django allows you to specify the model that will be used
 to govern the many-to-many relationship. You can then put extra fields on the
 intermediate model. The intermediate model is associated with the
 :class:`~django.db.models.ManyToManyField` using the
-:attr:`through <ManyToManyFields.through>` argument to point to the model
+:attr:`through <ManyToManyField.through>` argument to point to the model
 that will act as an intermediary. For our musician example, the code would look
 something like this::
 
@@ -426,7 +426,7 @@ There are a few restrictions on the intermediate model:
 
     * When defining a many-to-many relationship from a model to
       itself, using an intermediary model, you *must* use
-      :attr:`symmetrical=False <ManyToManyFields.symmetrical>` (see
+      :attr:`symmetrical=False <ManyToManyField.symmetrical>` (see
       :ref:`the model field reference <manytomany-arguments>`).
 
 Now that you have set up your :class:`~django.db.models.ManyToManyField` to use
@@ -1006,3 +1006,32 @@ field or method to every class that inherits the mix-in. Try to keep your
 inheritance hierarchies as simple and straightforward as possible so that you
 won't have to struggle to work out where a particular piece of information is
 coming from.
+
+Field name "hiding" is not permitted
+-------------------------------------
+
+In normal Python class inheritance, it is permissible for a child class to
+override any attribute from the parent class. In Django, this is not permitted
+for attributes that are :class:`~django.db.models.fields.Field` instances (at
+least, not at the moment). If a base class has a field called ``author``, you
+cannot create another model field called ``author`` in any class that inherits
+from that base class.
+
+Overriding fields in a parent model leads to difficulties in areas such as
+initialising new instances (specifying which field is being intialised in
+``Model.__init__``) and serialization. These are features which normal Python
+class inheritance doesn't have to deal with in quite the same way, so the
+difference between Django model inheritance and Python class inheritance isn't
+merely arbitrary.
+
+This restriction only applies to attributes which are
+:class:`~django.db.models.fields.Field` instances. Normal Python attributes
+can be overridden if you wish. It also only applies to the name of the
+attribute as Python sees it: if you are manually specifying the database
+column name, you can have the same column name appearing in both a child and
+an ancestor model for multi-table inheritance (they are columns in two
+different database tables).
+
+Django will raise a ``FieldError`` exception if you override any model field
+in any ancestor model.
+
