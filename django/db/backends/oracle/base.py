@@ -36,6 +36,7 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     needs_datetime_string_cast = False
     uses_custom_query_class = True
     interprets_empty_strings_as_nulls = True
+    uses_savepoints = True
 
 
 class DatabaseOperations(BaseDatabaseOperations):
@@ -151,6 +152,12 @@ WHEN (new.%(col_name)s IS NULL)
         connection.cursor()
         return connection.ops.regex_lookup(lookup_type)
 
+    def savepoint_create_sql(self, sid):
+        return "SAVEPOINT " + self.quote_name(sid)
+
+    def savepoint_rollback_sql(self, sid):
+        return "ROLLBACK TO SAVEPOINT " + self.quote_name(sid)
+
     def sql_flush(self, style, tables, sequences):
         # Return a list of 'TRUNCATE x;', 'TRUNCATE y;',
         # 'TRUNCATE z;'... style SQL statements
@@ -255,7 +262,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
 
         self.features = DatabaseFeatures()
         self.ops = DatabaseOperations()
-        self.client = DatabaseClient()
+        self.client = DatabaseClient(self)
         self.creation = DatabaseCreation(self)
         self.introspection = DatabaseIntrospection(self)
         self.validation = BaseDatabaseValidation()
@@ -263,23 +270,24 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     def _valid_connection(self):
         return self.connection is not None
 
-    def _connect_string(self, settings):
-        if len(settings.DATABASE_HOST.strip()) == 0:
-            settings.DATABASE_HOST = 'localhost'
-        if len(settings.DATABASE_PORT.strip()) != 0:
-            dsn = Database.makedsn(settings.DATABASE_HOST,
-                                   int(settings.DATABASE_PORT),
-                                   settings.DATABASE_NAME)
+    def _connect_string(self):
+        settings_dict = self.settings_dict
+        if len(settings_dict['DATABASE_HOST'].strip()) == 0:
+            settings_dict['DATABASE_HOST'] = 'localhost'
+        if len(settings_dict['DATABASE_PORT'].strip()) != 0:
+            dsn = Database.makedsn(settings_dict['DATABASE_HOST'],
+                                   int(settings_dict['DATABASE_PORT']),
+                                   settings_dict['DATABASE_NAME'])
         else:
-            dsn = settings.DATABASE_NAME
-        return "%s/%s@%s" % (settings.DATABASE_USER,
-                             settings.DATABASE_PASSWORD, dsn)
+            dsn = settings_dict['DATABASE_NAME']
+        return "%s/%s@%s" % (settings_dict['DATABASE_USER'],
+                             settings_dict['DATABASE_PASSWORD'], dsn)
 
-    def _cursor(self, settings):
+    def _cursor(self):
         cursor = None
         if not self._valid_connection():
-            conn_string = self._connect_string(settings)
-            self.connection = Database.connect(conn_string, **self.options)
+            conn_string = self._connect_string()
+            self.connection = Database.connect(conn_string, **self.settings_dict['DATABASE_OPTIONS'])
             cursor = FormatStylePlaceholderCursor(self.connection)
             # Set oracle date to ansi date format.  This only needs to execute
             # once when we create a new connection. We also set the Territory
@@ -308,6 +316,10 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         if not cursor:
             cursor = FormatStylePlaceholderCursor(self.connection)
         return cursor
+
+    # Oracle doesn't support savepoint commits.  Ignore them.
+    def _savepoint_commit(self, sid):
+        pass
 
 
 class OracleParam(object):
