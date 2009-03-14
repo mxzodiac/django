@@ -5,7 +5,8 @@ from django.forms.models import BaseInlineFormSet
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.admin import widgets
 from django.contrib.admin import helpers
-from django.contrib.admin.util import unquote, flatten_fieldsets, get_deleted_objects
+from django.contrib.admin.helpers import action_checkbox
+from django.contrib.admin.util import unquote, flatten_fieldsets, get_deleted_objects, model_ngettext
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
 from django.http import Http404, HttpResponse, HttpResponseRedirect
@@ -105,7 +106,7 @@ class BaseModelAdmin(object):
                     
         # If we've got overrides for the formfield defined, use 'em. **kwargs
         # passed to formfield_for_dbfield override the defaults.
-        if db_field.__class__ in self.formfield_overrides:
+        if db_field.__class___ in self.formfield_overrides:
             kwargs = dict(self.formfield_overrides[db_field.__class__], **kwargs)
             return db_field.formfield(**kwargs)
                         
@@ -172,7 +173,7 @@ class ModelAdmin(BaseModelAdmin):
     "Encapsulates all admin options and functionality for a given model."
     __metaclass__ = forms.MediaDefiningClass
     
-    list_display = ('__str__',)
+    list_display = (action_checkbox, '__str__',)
     list_display_links = ()
     list_filter = ()
     list_select_related = False
@@ -183,7 +184,11 @@ class ModelAdmin(BaseModelAdmin):
     save_on_top = False
     ordering = None
     inlines = []
-    
+    actions = ['delete_selected']
+    action_form = helpers.ActionForm
+    actions_on_top = True
+    actions_on_bottom = True
+
     # Custom templates (designed to be over-ridden in subclasses)
     change_form_template = None
     change_list_template = None
@@ -198,8 +203,16 @@ class ModelAdmin(BaseModelAdmin):
         for inline_class in self.inlines:
             inline_instance = inline_class(self.model, self.admin_site)
             self.inline_instances.append(inline_instance)
+        if action_checkbox not in self.list_display:
+            self.list_display = list(self.list_display)
+            self.list_display.insert(0, action_checkbox)
+        if not self.list_display_links:
+            for name in self.list_display:
+                if name != action_checkbox:
+                    self.list_display_links = [name]
+                    break
         super(ModelAdmin, self).__init__()
-        
+    
     def get_urls(self):
         from django.conf.urls.defaults import patterns, url
         
@@ -237,6 +250,8 @@ class ModelAdmin(BaseModelAdmin):
         from django.conf import settings
         
         js = ['js/core.js', 'js/admin/RelatedObjectLookups.js']
+        if self.actions:
+            js.append('js/actions.js')
         if self.prepopulated_fields:
             js.append('js/urlify.js')
         if self.opts.get_ordered_objects():
@@ -365,7 +380,21 @@ class ModelAdmin(BaseModelAdmin):
             action_flag     = DELETION
         )
     
-    
+    def delete_selected(self, request, changelist):
+        if self.has_delete_permission(request):
+            selected = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
+            objects = changelist.get_query_set().filter(pk__in=selected)
+            n = objects.count()
+            if n:
+                for obj in objects:
+                    object_repr = str(obj)
+                    self.log_deletion(request, obj, object_repr)
+                objects.delete()
+                self.message_user(request, _("Successfully deleted %d %s.") % (
+                    n, model_ngettext(self.opts, n)
+                ))
+    #delete_selected.short_description = _("Delete selected %(verbose_name_plural)s")
+
     def construct_change_message(self, request, form, formsets):
         """
         Construct a change message from a changed object.
@@ -685,7 +714,7 @@ class ModelAdmin(BaseModelAdmin):
             raise PermissionDenied
         try:
             cl = ChangeList(request, self.model, self.list_display, self.list_display_links, self.list_filter,
-                self.date_hierarchy, self.search_fields, self.list_select_related, self.list_per_page, self)
+                self.date_hierarchy, self.search_fields, self.list_select_related, self.list_per_page, self.action_form, self)
         except IncorrectLookupParameters:
             # Wacky lookup parameters were given, so redirect to the main
             # changelist page, without parameters, and pass an 'invalid=1'
@@ -703,6 +732,8 @@ class ModelAdmin(BaseModelAdmin):
             'has_add_permission': self.has_add_permission(request),
             'root_path': self.admin_site.root_path,
             'app_label': app_label,
+            'actions_on_top': self.actions_on_top,
+            'actions_on_bottom': self.actions_on_bottom
         }
         context.update(extra_context or {})
         return render_to_response(self.change_list_template or [

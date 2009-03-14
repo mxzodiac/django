@@ -4,7 +4,7 @@ from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from django.utils.text import capfirst
 from django.utils.encoding import force_unicode
-from django.utils.translation import ugettext as _
+from django.utils.translation import ungettext, ugettext as _
 
 def quote(s):
     """
@@ -155,3 +155,39 @@ def get_deleted_objects(deleted_objects, perms_needed, user, obj, opts, current_
             p = u'%s.%s' % (related.opts.app_label, related.opts.get_change_permission())
             if not user.has_perm(p):
                 perms_needed.add(related.opts.verbose_name)
+
+def model_format_dict(obj):
+    """
+    Return a `dict` with keys 'verbose_name' and 'verbose_name_plural',
+    typically for use with string formatting.
+
+    `obj` may be a `Model` instance, `Model` subclass, or `QuerySet` instance.
+
+    """
+    if isinstance(obj, (models.Model, models.base.ModelBase)):
+        opts = obj._meta
+    elif isinstance(obj, models.query.QuerySet):
+        opts = obj.model._meta
+    else:
+        opts = obj
+    return {
+        'verbose_name': force_unicode(opts.verbose_name),
+        'verbose_name_plural': force_unicode(opts.verbose_name_plural)
+    }
+
+def model_ngettext(obj, n=None):
+    """
+    Return the appropriate `verbose_name` or `verbose_name_plural` for `obj`
+    depending on the count `n`.
+
+    `obj` may be a `Model` instance, `Model` subclass, or `QuerySet` instance.
+    If `obj` is a `QuerySet` instance, `n` is optional and the length of the
+    `QuerySet` is used.
+
+    """
+    if isinstance(obj, models.query.QuerySet):
+        if n is None:
+            n = obj.count()
+        obj = obj.model
+    d = model_format_dict(obj)
+    return ungettext(d['verbose_name'], d['verbose_name_plural'], n or 0)

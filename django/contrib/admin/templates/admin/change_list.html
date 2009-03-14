@@ -31,7 +31,13 @@
 {% endif %}
 {% endblock %}
 
-{% block result_list %}{% result_list cl %}{% endblock %}
+{% block result_list %}
+<form id="action-form" method="post" action="">
+    {% if actions_on_top or not cl.paginator.count %}{% admin_actions %}{% endif %}
+    {% result_list cl %}
+    {% if actions_on_bottom and cl.paginator.count %}{% admin_actions %}{% endif %}
+</form>
+{% endblock %}
 {% block pagination %}{% pagination cl %}{% endblock %}
 </div>
 </div>

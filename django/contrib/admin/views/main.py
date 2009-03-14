@@ -1,12 +1,15 @@
 from django.contrib.admin.filterspecs import FilterSpec
 from django.contrib.admin.options import IncorrectLookupParameters
-from django.contrib.admin.util import quote
+from django.contrib.admin.util import quote, model_format_dict
+from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
 from django.core.paginator import Paginator, InvalidPage
 from django.db import models
 from django.db.models.query import QuerySet
 from django.utils.encoding import force_unicode, smart_str
 from django.utils.translation import ugettext
 from django.utils.http import urlencode
+from django.utils.text import capfirst
+from django.http import HttpResponse, HttpResponseRedirect
 import operator
 
 try:
@@ -32,7 +35,7 @@ ERROR_FLAG = 'e'
 EMPTY_CHANGELIST_VALUE = '(None)'
 
 class ChangeList(object):
-    def __init__(self, request, model, list_display, list_display_links, list_filter, date_hierarchy, search_fields, list_select_related, list_per_page, model_admin):
+    def __init__(self, request, model, list_display, list_display_links, list_filter, date_hierarchy, search_fields, list_select_related, list_per_page, action_form_class, model_admin):
         self.model = model
         self.opts = model._meta
         self.lookup_opts = self.opts
@@ -69,6 +72,72 @@ class ChangeList(object):
         self.title = (self.is_popup and ugettext('Select %s') % force_unicode(self.opts.verbose_name) or ugettext('Select %s to change') % force_unicode(self.opts.verbose_name))
         self.filter_specs, self.has_filters = self.get_filters(request)
         self.pk_attname = self.lookup_opts.pk.attname
+        self.action_form = self.get_action_form(request, action_form_class)
+
+    def _get_action_choices(self):
+        actions = getattr(self.model_admin, 'actions', [])
+        choices = []
+        for action in actions:
+            func, name, description = self.get_action(action)
+            choice = (name, description % model_format_dict(self.opts))
+            choices.append(choice)
+        return choices
+    action_choices = property(_get_action_choices)
+
+    def get_action(self, action_name):
+        if callable(action_name):
+            func = action_name
+        else:
+            try:
+                func = getattr(self.model_admin, action_name)
+            except AttributeError:
+                try:
+                    func = getattr(self.model, action_name)
+                except AttributeError:
+                    raise AttributeError, \
+                        "'%s' model or '%s' objects have no action '%s'" % \
+                            (self.lookup_opts.object_name, self.model_admin.__class__, action_name)
+        if callable(action_name):
+            name = action_name.__name__
+        else:
+            name = action_name
+        try:
+            description = func.short_description
+        except AttributeError:
+            description = capfirst(name.replace('_', ' '))
+        return func, name, description
+
+    def get_action_form(self, request, action_form_class):
+        if request.method == 'POST':
+            # There can be multiple action forms on the page (at the top
+            # and bottom of the change list, for example). Get the action
+            # whose button was pushed.
+            try:
+                action_index = int(request.POST.get('index', 0))
+            except ValueError:
+                action_index = 0
+            data = {}
+            for key in request.POST:
+                if key not in (ACTION_CHECKBOX_NAME, 'index'):
+                    data[key] = request.POST.getlist(key)[action_index]
+            action_form = action_form_class(data, auto_id=None)
+            action_form.fields['action'].choices = self.action_choices
+
+            if action_form.is_valid():
+                action = action_form.cleaned_data['action']
+                action_func, name, description = self.get_action(action)
+                response = None
+                if callable(action_func):
+                    response = action_func(request, self)
+                if isinstance(response, HttpResponse):
+                    return response
+                else:
+                    redirect_to = request.META.get('HTTP_REFERER') or "."
+                    return HttpResponseRedirect(redirect_to)
+        else:
+            action_form = action_form_class(auto_id=None)
+            action_form.fields['action'].choices = self.action_choices
+        return action_form
 
     def get_filters(self, request):
         filter_specs = []
