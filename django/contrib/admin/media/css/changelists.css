@@ -50,6 +50,7 @@
 
 #changelist table thead th {
     white-space: nowrap;
+    vertical-align: middle;
 }
 
 #changelist table tbody td {
@@ -215,10 +216,10 @@
 }
 
 #action-form .actions {
-    padding: 4px 3px;
-    border-top: 1px solid #fff;
-    border-bottom: 1px solid #ddd;
-    background: #efefef;
+    color: #666;
+    padding: 3px;
+    font-weight: bold;
+    background: #efefef url(../img/admin/nav-bg.gif);
 }
 
 #action-form .actions:last-child {
@@ -227,15 +228,16 @@
 
 #action-form .actions select {
     border: 1px solid #aaa;
+    margin: 0 0.5em;
+}
+
+#action-toggle {
+    display: none;
 }
 
 #action-form .actions label {
     font-size: 11px;
-    margin-left: 1.5em;
-}
-
-#action-form .actions button.all {
-    display: none;
+    margin-left: 0.5em;
 }
 
 #action-form tbody tr input.action-select {
@@ -251,12 +253,4 @@
     border-left: 0;
     border-right: 1px solid #ddd;
     text-align: center;
-}
-
-#action-form tbody tr.selected a,
-#action-form tbody tr.selected th,
-#action-form tbody tr.selected td {
-    color: #fff;
-    background-color: #6C9DCC;
-    border-color: #83ACDF;
 }

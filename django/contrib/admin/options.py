@@ -5,10 +5,10 @@ from django.forms.models import BaseInlineFormSet
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.admin import widgets
 from django.contrib.admin import helpers
-from django.contrib.admin.helpers import action_checkbox
-from django.contrib.admin.util import unquote, flatten_fieldsets, get_deleted_objects, model_ngettext
+from django.contrib.admin.util import unquote, flatten_fieldsets, get_deleted_objects, model_ngettext, model_format_dict
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
+from django.db.models.fields import BLANK_CHOICE_DASH
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render_to_response
 from django.utils.functional import update_wrapper
@@ -16,7 +16,7 @@ from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from django.utils.functional import curry
 from django.utils.text import capfirst, get_text_list
-from django.utils.translation import ugettext as _
+from django.utils.translation import ugettext as _, ugettext_lazy
 from django.utils.encoding import force_unicode
 try:
     set
@@ -106,7 +106,7 @@ class BaseModelAdmin(object):
                     
         # If we've got overrides for the formfield defined, use 'em. **kwargs
         # passed to formfield_for_dbfield override the defaults.
-        if db_field.__class___ in self.formfield_overrides:
+        if db_field.__class__ in self.formfield_overrides:
             kwargs = dict(self.formfield_overrides[db_field.__class__], **kwargs)
             return db_field.formfield(**kwargs)
                         
@@ -173,7 +173,7 @@ class ModelAdmin(BaseModelAdmin):
     "Encapsulates all admin options and functionality for a given model."
     __metaclass__ = forms.MediaDefiningClass
     
-    list_display = (action_checkbox, '__str__',)
+    list_display = ('action_checkbox', '__str__',)
     list_display_links = ()
     list_filter = ()
     list_select_related = False
@@ -184,16 +184,18 @@ class ModelAdmin(BaseModelAdmin):
     save_on_top = False
     ordering = None
     inlines = []
-    actions = ['delete_selected']
-    action_form = helpers.ActionForm
-    actions_on_top = True
-    actions_on_bottom = True
-
+    
     # Custom templates (designed to be over-ridden in subclasses)
     change_form_template = None
     change_list_template = None
     delete_confirmation_template = None
     object_history_template = None
+    
+    # Actions
+    actions = ['delete_selected']
+    action_form = helpers.ActionForm
+    actions_on_top = False
+    actions_on_bottom = True
     
     def __init__(self, model, admin_site):
         self.model = model
@@ -203,16 +205,16 @@ class ModelAdmin(BaseModelAdmin):
         for inline_class in self.inlines:
             inline_instance = inline_class(self.model, self.admin_site)
             self.inline_instances.append(inline_instance)
-        if action_checkbox not in self.list_display:
+        if 'action_checkbox' not in self.list_display:
             self.list_display = list(self.list_display)
-            self.list_display.insert(0, action_checkbox)
+            self.list_display.insert(0, 'action_checkbox')
         if not self.list_display_links:
             for name in self.list_display:
-                if name != action_checkbox:
+                if name != 'action_checkbox':
                     self.list_display_links = [name]
                     break
         super(ModelAdmin, self).__init__()
-    
+        
     def get_urls(self):
         from django.conf.urls.defaults import patterns, url
         
@@ -251,7 +253,7 @@ class ModelAdmin(BaseModelAdmin):
         
         js = ['js/core.js', 'js/admin/RelatedObjectLookups.js']
         if self.actions:
-            js.append('js/actions.js')
+            js.extend(['js/getElementsBySelector.js', 'js/actions.js'])
         if self.prepopulated_fields:
             js.append('js/urlify.js')
         if self.opts.get_ordered_objects():
@@ -380,21 +382,64 @@ class ModelAdmin(BaseModelAdmin):
             action_flag     = DELETION
         )
     
+    def action_checkbox(self, obj):
+        """
+        A list_display column containing a checkbox widget.
+        """
+        return helpers.checkbox.render(helpers.ACTION_CHECKBOX_NAME, force_unicode(obj.pk))
+    action_checkbox.short_description = mark_safe('<input type="checkbox" id="action-toggle" />')
+    action_checkbox.allow_tags = True
+    
+    def _get_action_choices(self, blank_choice=BLANK_CHOICE_DASH):
+        if hasattr(self, '_action_choices'):
+            return self._action_choices
+        self._action_choices = blank_choice
+        for action in getattr(self, 'actions', []):
+            func, name, description = self.get_action(action)
+            choice = (name, description % model_format_dict(self.opts))
+            self._action_choices.append(choice)
+        return self._action_choices
+    action_choices = property(_get_action_choices)
+    
+    def get_action(self, name_or_callable):
+        if callable(name_or_callable):
+            func = name_or_callable
+            name = name_or_callable.__name__
+        else:
+            try:
+                func = getattr(self, name_or_callable)
+            except AttributeError:
+                try:
+                    func = getattr(self.model, name_or_callable)
+                except AttributeError:
+                    raise AttributeError, \
+                        "'%s' model or '%s' objects have no action '%s'" % \
+                            (self.opts.object_name, self.__class__, name_or_callable)
+            name = name_or_callable
+        if hasattr(func, 'short_description'):
+            description = func.short_description
+        else:
+            description = capfirst(name.replace('_', ' '))
+        return func, name, description
+    
     def delete_selected(self, request, changelist):
+        """
+        Default action which deletes the selected objects.
+        """
         if self.has_delete_permission(request):
             selected = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
-            objects = changelist.get_query_set().filter(pk__in=selected)
-            n = objects.count()
+            objs = changelist.get_query_set().filter(pk__in=selected)
+            n = objs.count()
             if n:
-                for obj in objects:
-                    object_repr = str(obj)
-                    self.log_deletion(request, obj, object_repr)
-                objects.delete()
+                for obj in objs:
+                    obj_display = force_unicode(obj)
+                    self.log_deletion(request, obj, obj_display)
+                objs.delete()
                 self.message_user(request, _("Successfully deleted %d %s.") % (
                     n, model_ngettext(self.opts, n)
                 ))
-    #delete_selected.short_description = _("Delete selected %(verbose_name_plural)s")
-
+    delete_selected.short_description = ugettext_lazy("Delete selected %(verbose_name_plural)s")
+    
     def construct_change_message(self, request, form, formsets):
         """
         Construct a change message from a changed object.
@@ -532,6 +577,38 @@ class ModelAdmin(BaseModelAdmin):
         else:
             self.message_user(request, msg)
             return HttpResponseRedirect("../")
+
+    def response_action(self, request, changelist):
+        if request.method == 'POST':
+            # There can be multiple action forms on the page (at the top
+            # and bottom of the change list, for example). Get the action
+            # whose button was pushed.
+            try:
+                action_index = int(request.POST.get('index', 0))
+            except ValueError:
+                action_index = 0
+            data = {}
+            for key in request.POST:
+                if key not in (helpers.ACTION_CHECKBOX_NAME, 'index'):
+                    data[key] = request.POST.getlist(key)[action_index]
+            action_form = self.action_form(data, auto_id=None)
+            action_form.fields['action'].choices = self.action_choices
+            
+            if action_form.is_valid():
+                action = action_form.cleaned_data['action']
+                action_func, name, description = self.get_action(action)
+                response = None
+                if callable(action_func):
+                    response = action_func(request, changelist)
+                if isinstance(response, HttpResponse):
+                    return response
+                else:
+                    redirect_to = request.META.get('HTTP_REFERER') or "."
+                    return HttpResponseRedirect(redirect_to)
+        else:
+            action_form = self.action_form(auto_id=None)
+            action_form.fields['action'].choices = self.action_choices
+        return action_form
     
     def add_view(self, request, form_url='', extra_context=None):
         "The 'add' admin view for this model."
@@ -714,7 +791,7 @@ class ModelAdmin(BaseModelAdmin):
             raise PermissionDenied
         try:
             cl = ChangeList(request, self.model, self.list_display, self.list_display_links, self.list_filter,
-                self.date_hierarchy, self.search_fields, self.list_select_related, self.list_per_page, self.action_form, self)
+                self.date_hierarchy, self.search_fields, self.list_select_related, self.list_per_page, self)
         except IncorrectLookupParameters:
             # Wacky lookup parameters were given, so redirect to the main
             # changelist page, without parameters, and pass an 'invalid=1'
@@ -725,15 +802,21 @@ class ModelAdmin(BaseModelAdmin):
                 return render_to_response('admin/invalid_setup.html', {'title': _('Database error')})
             return HttpResponseRedirect(request.path + '?' + ERROR_FLAG + '=1')
         
+        action_response = self.response_action(request, cl)
+        if isinstance(action_response, HttpResponse):
+            return action_response
+        
         context = {
             'title': cl.title,
             'is_popup': cl.is_popup,
             'cl': cl,
+            'media': mark_safe(self.media),
             'has_add_permission': self.has_add_permission(request),
             'root_path': self.admin_site.root_path,
             'app_label': app_label,
+            'action_form': action_response,
             'actions_on_top': self.actions_on_top,
-            'actions_on_bottom': self.actions_on_bottom
+            'actions_on_bottom': self.actions_on_bottom,
         }
         context.update(extra_context or {})
         return render_to_response(self.change_list_template or [

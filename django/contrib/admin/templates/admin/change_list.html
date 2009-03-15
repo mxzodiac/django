@@ -3,6 +3,8 @@
 
 {% block extrastyle %}{{ block.super }}<link rel="stylesheet" type="text/css" href="{% admin_media_prefix %}css/changelists.css" />{% endblock %}
 
+{% block extrahead %}{{ block.super }}{{ media }}{% endblock %}
+
 {% block bodyclass %}change-list{% endblock %}
 
 {% if not is_popup %}{% block breadcrumbs %}<div class="breadcrumbs"><a href="../../">{% trans "Home" %}</a> &rsaquo; <a href="../">{{ app_label|capfirst }}</a> &rsaquo; {{ cl.opts.verbose_name_plural|capfirst }}</div>{% endblock %}{% endif %}
@@ -33,9 +35,9 @@
 
 {% block result_list %}
 <form id="action-form" method="post" action="">
-    {% if actions_on_top or not cl.paginator.count %}{% admin_actions %}{% endif %}
+    {% if actions_on_top and cl.full_result_count %}{% admin_actions %}{% endif %}
     {% result_list cl %}
-    {% if actions_on_bottom and cl.paginator.count %}{% admin_actions %}{% endif %}
+    {% if actions_on_bottom and cl.full_result_count %}{% admin_actions %}{% endif %}
 </form>
 {% endblock %}
 {% block pagination %}{% pagination cl %}{% endblock %}

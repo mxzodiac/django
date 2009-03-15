@@ -1,7 +1,5 @@
 {% load i18n %}
 <div class="actions">
-    <button type="button" class="button all" name="select_all" title="{% blocktrans with cl.opts.verbose_name_plural as verbose_name_plural %}Select all {{ verbose_name_plural }}{% endblocktrans %}">{% trans "Select all" %}</button>
-    <button type="button" class="button all" name="deselect_all" title="{% blocktrans with cl.opts.verbose_name_plural as verbose_name_plural %}Deselect all {{ verbose_name_plural }}{% endblocktrans %}">{% trans "Deselect all" %}</button>
-    {% for field in cl.action_form %}<label>{{ field.label }} {{ field }}</label>{% endfor %}
-    <button type="submit" class="button" title="{% trans "Perform the selected action" %}" name="index" value="{{ action_index|default:0 }}">{% trans "Go" %}</button>
+    {% for field in action_form %}<label>{% trans "Action:" %} {{ field }}</label>{% endfor %}
+    <button type="submit" class="button" title="{% trans "Run the selected action" %}" name="index" value="{{ action_index|default:0 }}">{% trans "Go" %}</button>
 </div>

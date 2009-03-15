@@ -6,6 +6,7 @@ from django.utils.safestring import mark_safe
 from django.utils.encoding import force_unicode
 from django.contrib.admin.util import flatten_fieldsets
 from django.contrib.contenttypes.models import ContentType
+from django.utils.translation import ugettext_lazy as _
 
 ACTION_CHECKBOX_NAME = 'selected'
 
@@ -13,14 +14,6 @@ class ActionForm(forms.Form):
     action = forms.ChoiceField()
 
 checkbox = forms.CheckboxInput({'class': 'action-select'}, lambda value: False)
-
-def action_checkbox(obj):
-    """
-    A `list_display` column containing a checkbox widget.
-    """
-    return checkbox.render(ACTION_CHECKBOX_NAME, str(obj.pk))
-action_checkbox.short_description = mark_safe('&#x2713;')
-action_checkbox.allow_tags = True
 
 class AdminForm(object):
     def __init__(self, form, fieldsets, prepopulated_fields):
