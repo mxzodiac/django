@@ -11,7 +11,7 @@ from django.utils.translation import ugettext_lazy as _
 ACTION_CHECKBOX_NAME = 'selected'
 
 class ActionForm(forms.Form):
-    action = forms.ChoiceField()
+    action = forms.ChoiceField(label=_('Action:'))
 
 checkbox = forms.CheckboxInput({'class': 'action-select'}, lambda value: False)
 
