@@ -39,7 +39,7 @@ class DatabaseOperations(PostgresqlDatabaseOperations):
         return cursor.query
 
     def return_insert_id(self):
-        return "RETURNING %s"
+        return "RETURNING %s", ()
 
 class DatabaseWrapper(BaseDatabaseWrapper):
     operators = {
@@ -63,12 +63,9 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         super(DatabaseWrapper, self).__init__(*args, **kwargs)
 
         self.features = DatabaseFeatures()
-        if settings.DATABASE_OPTIONS.get('autocommit', False):
-          self.features.uses_autocommit = True
-          self._iso_level_0()
-        else:
-          self.features.uses_autocommit = False
-          self._iso_level_1()
+        autocommit = self.settings_dict["DATABASE_OPTIONS"].get('autocommit', False)
+        self.features.uses_autocommit = autocommit
+        self._set_isolation_level(int(not autocommit))
         self.ops = DatabaseOperations()
         self.client = DatabaseClient(self)
         self.creation = DatabaseCreation(self)
@@ -108,6 +105,15 @@ class DatabaseWrapper(BaseDatabaseWrapper):
             if self._version < (8, 0):
                 # No savepoint support for earlier version of PostgreSQL.
                 self.features.uses_savepoints = False
+            if self._version < (8, 2):
+                # Cannot return the insert ID as part of an INSERT statement
+                # prior to version 8.2.
+                self.features.can_return_id_from_insert = False
+                if self.features.uses_autocommit:
+                    # FIXME: Needs extra code to do reliable model insert
+                    # handling, so we forbid it for now.
+                    from django.core.exceptions import ImproperlyConfigured
+                    raise ImproperlyConfigured("You cannot use autocommit=True with PostgreSQL prior to 8.2 at the moment.")
         return cursor
 
     def _enter_transaction_management(self, managed):
@@ -116,7 +122,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         the same transaction is visible across all the queries.
         """
         if self.features.uses_autocommit and managed and not self.isolation_level:
-            self._iso_level_1()
+            self._set_isolation_level(1)
 
     def _leave_transaction_management(self, managed):
         """
@@ -124,29 +130,19 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         leaving transaction management.
         """
         if self.features.uses_autocommit and not managed and self.isolation_level:
-            self._iso_level_0()
+            self._set_isolation_level(0)
 
-    def _iso_level_0(self):
+    def _set_isolation_level(self, level):
         """
-        Do all the related feature configurations for isolation level 0. This
-        doesn't touch the uses_autocommit feature, since that controls the
-        movement *between* isolation levels.
+        Do all the related feature configurations for changing isolation
+        levels. This doesn't touch the uses_autocommit feature, since that
+        controls the movement *between* isolation levels.
         """
+        assert level in (0, 1)
         try:
             if self.connection is not None:
-                self.connection.set_isolation_level(0)
+                self.connection.set_isolation_level(level)
         finally:
-            self.isolation_level = 0
-            self.features.uses_savepoints = False
-
-    def _iso_level_1(self):
-        """
-        The "isolation level 1" version of _iso_level_0().
-        """
-        try:
-            if self.connection is not None:
-                self.connection.set_isolation_level(1)
-        finally:
-            self.isolation_level = 1
-            self.features.uses_savepoints = True
+            self.isolation_level = level
+            self.features.uses_savepoints = bool(level)
 
