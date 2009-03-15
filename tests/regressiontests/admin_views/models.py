@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from django.db import models
 from django.contrib import admin
+from django.core.mail import EmailMessage
 
 class Section(models.Model):
     """
@@ -177,6 +178,56 @@ class PersonaAdmin(admin.ModelAdmin):
         BarAccountAdmin
     )
 
+class Subscriber(models.Model):
+    name = models.CharField(blank=False, max_length=80)
+    email = models.EmailField(blank=False, max_length=175)
+
+    def __unicode__(self):
+        return "%s (%s)" % (self.name, self.email)
+
+class SubscriberAdmin(admin.ModelAdmin):
+    actions = ['delete_selected', 'mail_admin']
+
+    def mail_admin(self, request, selected):
+        EmailMessage(
+            'Greetings from a ModelAdmin action',
+            'This is the test email from a admin action',
+            'from@example.com',
+            ['to@example.com']
+        ).send()
+
+class DirectSubscriber(Subscriber):
+    paid = models.BooleanField(default=False)
+
+    def direct_mail(self, request):
+        EmailMessage(
+            'Greetings from a model action',
+            'This is the test email from a model action',
+            'from@example.com',
+            [self.email]
+        ).send()
+
+class DirectSubscriberAdmin(admin.ModelAdmin):
+    actions = ['direct_mail']
+
+class ExternalSubscriber(Subscriber):
+    pass
+
+def external_mail(request, selected):
+    EmailMessage(
+        'Greetings from a function action',
+        'This is the test email from a function action',
+        'from@example.com',
+        ['to@example.com']
+    ).send()
+
+def redirect_to(request, selected):
+    from django.http import HttpResponseRedirect
+    return HttpResponseRedirect('/some-where-else/')
+
+class ExternalSubscriberAdmin(admin.ModelAdmin):
+    actions = [external_mail, redirect_to]
+
 admin.site.register(Article, ArticleAdmin)
 admin.site.register(CustomArticle, CustomArticleAdmin)
 admin.site.register(Section, inlines=[ArticleInline])
@@ -184,6 +235,9 @@ admin.site.register(ModelWithStringPrimaryKey)
 admin.site.register(Color)
 admin.site.register(Thing, ThingAdmin)
 admin.site.register(Persona, PersonaAdmin)
+admin.site.register(Subscriber, SubscriberAdmin)
+admin.site.register(DirectSubscriber, DirectSubscriberAdmin)
+admin.site.register(ExternalSubscriber, ExternalSubscriberAdmin)
 
 # We intentionally register Promo and ChapterXtra1 but not Chapter nor ChapterXtra2.
 # That way we cover all four cases:

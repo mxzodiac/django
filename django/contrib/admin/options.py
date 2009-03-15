@@ -213,6 +213,10 @@ class ModelAdmin(BaseModelAdmin):
                 if name != 'action_checkbox':
                     self.list_display_links = [name]
                     break
+        self.callable_actions = {}
+        for action in getattr(self, 'actions', []):
+            if callable(action):
+                self.callable_actions[action.__name__] = action
         super(ModelAdmin, self).__init__()
         
     def get_urls(self):
@@ -390,51 +394,47 @@ class ModelAdmin(BaseModelAdmin):
     action_checkbox.short_description = mark_safe('<input type="checkbox" id="action-toggle" />')
     action_checkbox.allow_tags = True
     
-    def _get_action_choices(self, blank_choice=BLANK_CHOICE_DASH):
-        if hasattr(self, '_action_choices'):
-            return self._action_choices
-        self._action_choices = blank_choice
+    def get_action_choices(self, default_choices=BLANK_CHOICE_DASH):
+        choices = [] + default_choices
         for action in getattr(self, 'actions', []):
-            func, name, description = self.get_action(action)
+            func, name, description, instance_action = self.get_action(action)
             choice = (name, description % model_format_dict(self.opts))
-            self._action_choices.append(choice)
-        return self._action_choices
-    action_choices = property(_get_action_choices)
-    
-    def get_action(self, name_or_callable):
-        if callable(name_or_callable):
-            func = name_or_callable
-            name = name_or_callable.__name__
+            choices.append(choice)
+        return choices
+
+    def get_action(self, action):
+        is_instance_action = False
+        if callable(action):
+            func = action
+            action = action.__name__
+        elif hasattr(self, action):
+            func = getattr(self, action)
+        elif hasattr(self.model, action):
+            func = getattr(self.model, action)
+            is_instance_action = True
         else:
-            try:
-                func = getattr(self, name_or_callable)
-            except AttributeError:
-                try:
-                    func = getattr(self.model, name_or_callable)
-                except AttributeError:
-                    raise AttributeError, \
-                        "'%s' model or '%s' objects have no action '%s'" % \
-                            (self.opts.object_name, self.__class__, name_or_callable)
-            name = name_or_callable
+            if action in [name for name in self.callable_actions]:
+                return self.get_action(self.callable_actions[action])
+            raise AttributeError, \
+                "'%s' model or '%s' have no action '%s'" % \
+                    (self.opts.object_name, self.__class__.__name__, action)
         if hasattr(func, 'short_description'):
             description = func.short_description
         else:
-            description = capfirst(name.replace('_', ' '))
-        return func, name, description
+            description = capfirst(action.replace('_', ' '))
+        return func, action, description, is_instance_action
     
-    def delete_selected(self, request, changelist):
+    def delete_selected(self, request, selected):
         """
         Default action which deletes the selected objects.
         """
         if self.has_delete_permission(request):
-            selected = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
-            objs = changelist.get_query_set().filter(pk__in=selected)
-            n = objs.count()
+            n = selected.count()
             if n:
-                for obj in objs:
+                for obj in selected:
                     obj_display = force_unicode(obj)
                     self.log_deletion(request, obj, obj_display)
-                objs.delete()
+                selected.delete()
                 self.message_user(request, _("Successfully deleted %d %s.") % (
                     n, model_ngettext(self.opts, n)
                 ))
@@ -592,14 +592,20 @@ class ModelAdmin(BaseModelAdmin):
                 if key not in (helpers.ACTION_CHECKBOX_NAME, 'index'):
                     data[key] = request.POST.getlist(key)[action_index]
             action_form = self.action_form(data, auto_id=None)
-            action_form.fields['action'].choices = self.action_choices
+            action_form.fields['action'].choices = self.get_action_choices()
             
             if action_form.is_valid():
                 action = action_form.cleaned_data['action']
-                action_func, name, description = self.get_action(action)
+                func, name, description, instance_action = self.get_action(action)
+                selected = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
+                results = changelist.get_query_set().filter(pk__in=selected)
                 response = None
-                if callable(action_func):
-                    response = action_func(request, changelist)
+                if callable(func):
+                    if instance_action:
+                        for obj in results:
+                            getattr(obj, name)(request)
+                    else:
+                        response = func(request, results)
                 if isinstance(response, HttpResponse):
                     return response
                 else:
@@ -607,7 +613,7 @@ class ModelAdmin(BaseModelAdmin):
                     return HttpResponseRedirect(redirect_to)
         else:
             action_form = self.action_form(auto_id=None)
-            action_form.fields['action'].choices = self.action_choices
+            action_form.fields['action'].choices = self.get_action_choices()
         return action_form
     
     def add_view(self, request, form_url='', extra_context=None):

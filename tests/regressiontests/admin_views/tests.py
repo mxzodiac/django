@@ -8,10 +8,11 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.admin.models import LogEntry
 from django.contrib.admin.sites import LOGIN_FORM_KEY
 from django.contrib.admin.util import quote
+from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
 from django.utils.html import escape
 
 # local test models
-from models import Article, CustomArticle, Section, ModelWithStringPrimaryKey, Persona, FooAccount, BarAccount
+from models import Article, CustomArticle, Section, ModelWithStringPrimaryKey, Persona, FooAccount, BarAccount, Subscriber, DirectSubscriber, ExternalSubscriber
 
 try:
     set
@@ -805,3 +806,69 @@ class AdminInheritedInlinesTest(TestCase):
         self.failUnlessEqual(FooAccount.objects.all()[0].username, "%s-1" % foo_user)
         self.failUnlessEqual(BarAccount.objects.all()[0].username, "%s-1" % bar_user)
         self.failUnlessEqual(Persona.objects.all()[0].accounts.count(), 2)
+
+from django.core import mail
+
+class AdminActionsTest(TestCase):
+    fixtures = ['admin-views-users.xml', 'admin-views-actions.xml']
+
+    def setUp(self):
+        self.client.login(username='super', password='secret')
+
+    def tearDown(self):
+        self.client.logout()
+
+    def test_model_admin_custom_action(self):
+        "Tests a custom action defined in a ModelAdmin method"
+        action_data = {
+            ACTION_CHECKBOX_NAME: [1],
+            'action' : 'mail_admin',
+            'index': 0,
+        }
+        response = self.client.post('/test_admin/admin/admin_views/subscriber/', action_data)
+        self.assertEquals(len(mail.outbox), 1)
+        self.assertEquals(mail.outbox[0].subject, 'Greetings from a ModelAdmin action')
+
+    def test_model_admin_default_delete_action(self):
+        "Tests the default delete action defined as a ModelAdmin method"
+        action_data = {
+            ACTION_CHECKBOX_NAME: [1, 2],
+            'action' : 'delete_selected',
+            'index': 0,
+        }
+        response = self.client.post('/test_admin/admin/admin_views/subscriber/', action_data)
+        self.failUnlessEqual(Subscriber.objects.count(), 0)
+
+    def test_custom_model_instance_action(self):
+        "Tests a custom action defined in a model method"
+        action_data = {
+            ACTION_CHECKBOX_NAME: [1],
+            'action' : 'direct_mail',
+            'index': 0,
+            'paid': 1,
+        }
+        response = self.client.post('/test_admin/admin/admin_views/directsubscriber/', action_data)
+        self.assertEquals(len(mail.outbox), 1)
+        self.assertEquals(mail.outbox[0].subject, 'Greetings from a model action')
+        self.assertEquals(mail.outbox[0].to, [u'john@example.org'])
+
+    def test_custom_function_mail_action(self):
+        "Tests a custom action defined in a function"
+        action_data = {
+            ACTION_CHECKBOX_NAME: [1],
+            'action' : 'external_mail',
+            'index': 0,
+        }
+        response = self.client.post('/test_admin/admin/admin_views/externalsubscriber/', action_data)
+        self.assertEquals(len(mail.outbox), 1)
+        self.assertEquals(mail.outbox[0].subject, 'Greetings from a function action')
+
+    def test_custom_function_action_with_redirect(self):
+        "Tests a custom action defined in a function"
+        action_data = {
+            ACTION_CHECKBOX_NAME: [1],
+            'action' : 'redirect_to',
+            'index': 0,
+        }
+        response = self.client.post('/test_admin/admin/admin_views/externalsubscriber/', action_data)
+        self.failUnlessEqual(response.status_code, 302)
