@@ -413,7 +413,7 @@ class ModelAdmin(BaseModelAdmin):
             func = getattr(self.model, action)
             is_instance_action = True
         else:
-            if action in [name for name in self.callable_actions]:
+            if action in self.callable_actions:
                 return self.get_action(self.callable_actions[action])
             raise AttributeError, \
                 "'%s' model or '%s' have no action '%s'" % \
