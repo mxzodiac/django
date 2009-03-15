@@ -213,10 +213,6 @@ class ModelAdmin(BaseModelAdmin):
                 if name != 'action_checkbox':
                     self.list_display_links = [name]
                     break
-        self.callable_actions = {}
-        for action in getattr(self, 'actions', []):
-            if callable(action):
-                self.callable_actions[action.__name__] = action
         super(ModelAdmin, self).__init__()
         
     def get_urls(self):
@@ -413,8 +409,12 @@ class ModelAdmin(BaseModelAdmin):
             func = getattr(self.model, action)
             is_instance_action = True
         else:
-            if action in self.callable_actions:
-                return self.get_action(self.callable_actions[action])
+            callable_actions = {}
+            for item in getattr(self, 'actions', []):
+                if callable(item):
+                    callable_actions[item.__name__] = item
+            if action in callable_actions:
+                return self.get_action(callable_actions[action])
             raise AttributeError, \
                 "'%s' model or '%s' have no action '%s'" % \
                     (self.opts.object_name, self.__class__.__name__, action)
