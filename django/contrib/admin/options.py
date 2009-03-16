@@ -315,6 +315,9 @@ class ModelAdmin(BaseModelAdmin):
         return modelform_factory(self.model, **defaults)
     
     def get_changelist_form(self, request, **kwargs):
+        """
+        Returns a Form class for use in the Formset on the changelist page.
+        """
         defaults = {
             "formfield_callback": curry(self.formfield_for_dbfield, 
                 request=request),
@@ -323,6 +326,10 @@ class ModelAdmin(BaseModelAdmin):
         return modelform_factory(self.model, **defaults)
     
     def get_changelist_formset(self, request, **kwargs):
+        """
+        Returns a FormSet class for use on the changelist page if list_editable 
+        is used.
+        """
         return modelformset_factory(self.model, 
             self.get_changelist_form(request), extra=0, 
             fields=self.list_editable)
