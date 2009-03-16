@@ -4,7 +4,7 @@
 {% block extrastyle %}
     {{ block.super }}
     <link rel="stylesheet" type="text/css" href="{% admin_media_prefix %}css/changelists.css" />
-    {% if formset %}
+    {% if cl.formset %}
         <link rel="stylesheet" type="text/css" href="{% admin_media_prefix %}css/forms.css" />
     {% endif %}
 {% endblock %}
@@ -60,18 +60,18 @@
                     </div>
                 {% endif %}
             {% endblock %}
-            {% if formset %}
-                <form action="" method="post"{% if formset.is_multipart %} enctype="multipart/form-data"{% endif %}>
-                {{ formset.management_form }}
+            {% if cl.formset %}
+                <form action="" method="post"{% if cl.formset.is_multipart %} enctype="multipart/form-data"{% endif %}>
+                {{ cl.formset.management_form }}
             {% endif %}
 
             {% block result_list %}
-                {% result_list cl formset %}
+                {% result_list cl %}
             {% endblock %}
             {% block pagination %}
-                {% pagination cl formset %}
+                {% pagination cl %}
             {% endblock %}
-            {% if formset %}
+            {% if cl.formset %}
                 </form>
             {% endif %}
         </div>

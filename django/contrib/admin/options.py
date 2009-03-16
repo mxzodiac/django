@@ -733,12 +733,12 @@ class ModelAdmin(BaseModelAdmin):
             formset = FormSet(queryset=cl.result_list)
         else:
             formset = None
+        cl.formset = formset
 
         context = {
             'title': cl.title,
             'is_popup': cl.is_popup,
             'cl': cl,
-            'formset': formset,
             'has_add_permission': self.has_add_permission(request),
             'root_path': self.admin_site.root_path,
             'app_label': app_label,
