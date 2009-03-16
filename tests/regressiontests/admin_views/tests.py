@@ -18,7 +18,6 @@ try:
 except NameError:
     from sets import Set as set
 
-
 class AdminViewBasicTest(TestCase):
     fixtures = ['admin-views-users.xml', 'admin-views-colors.xml']
 
@@ -733,9 +732,6 @@ class AdminViewUnicodeTest(TestCase):
 
 class AdminViewListEditable(TestCase):
     fixtures = ['admin-views-users.xml', 'admin-views-person.xml']
-    
-class AdminInheritedInlinesTest(TestCase):
-    fixtures = ['admin-views-users.xml',]
 
     def setUp(self):
         self.client.login(username='super', password='secret')
