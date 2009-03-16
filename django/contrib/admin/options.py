@@ -717,9 +717,8 @@ class ModelAdmin(BaseModelAdmin):
                 return render_to_response('admin/invalid_setup.html', {'title': _('Database error')})
             return HttpResponseRedirect(request.path + '?' + ERROR_FLAG + '=1')
         
-        FormSet = self.get_changelist_formset(request)
-        
         if request.method == "POST" and self.list_editable:
+            FormSet = self.get_changelist_formset(request)
             formset = FormSet(request.POST, request.FILES, queryset=cl.result_list)
             if formset.is_valid():
                 for form in formset.forms:
@@ -730,6 +729,7 @@ class ModelAdmin(BaseModelAdmin):
                     self.log_change(request, obj, change_msg)
                 return HttpResponseRedirect(request.get_full_path())
         elif self.list_editable:
+            FormSet = self.get_changelist_formset(request)
             formset = FormSet(queryset=cl.result_list)
         else:
             formset = None
