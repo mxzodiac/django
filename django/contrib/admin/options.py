@@ -428,7 +428,32 @@ class ModelAdmin(BaseModelAdmin):
         """
         Default action which deletes the selected objects.
         """
-        if self.has_delete_permission(request):
+        opts = self.model._meta
+        app_label = opts.app_label
+        
+        if not self.has_delete_permission(request):
+            raise PermissionDenied
+                    
+        # Populate deleted_objects, a data structure of all related objects that
+        # will also be deleted.
+        
+        # deleted_objects must be a list if we want to use '|unordered_list' in the template
+        deleted_objects = []
+        for obj in selected:
+            deleted_objects.append([mark_safe(u'%s: <a href="%s/">%s</a>' % (escape(force_unicode(capfirst(opts.verbose_name))), obj.pk, escape(obj))), []])
+        perms_needed = set()
+        
+        i = 0
+        for d in deleted_objects:
+            # FIXME: the urlpath to the detail-view of the related objects are hardcoded as "../../../../"
+            #        which is wrong from this changelist_view. Is there a admin-reverse-urlconf refactor?
+            get_deleted_objects(deleted_objects[i], perms_needed, request.user, selected[i], opts, 1, self.admin_site)      
+            i=i+1
+        
+        # The user has already confirmed the deletion.
+        if request.POST.get('post'):
+            if perms_needed:
+                raise PermissionDenied
             n = selected.count()
             if n:
                 for obj in selected:
@@ -438,6 +463,25 @@ class ModelAdmin(BaseModelAdmin):
                 self.message_user(request, _("Successfully deleted %d %s.") % (
                     n, model_ngettext(self.opts, n)
                 ))
+            return None
+        
+        context = {
+            "title": _("Are you sure?"),
+            "object_name": force_unicode(opts.verbose_name),
+            "deleted_objects": deleted_objects,
+            'selected': selected,
+            "perms_lacking": perms_needed,
+            "opts": opts,
+            "root_path": self.admin_site.root_path,
+            "app_label": app_label,
+        }
+        
+        return render_to_response(self.delete_confirmation_template or [
+            "admin/%s/%s/delete_selected_confirmation.html" % (app_label, opts.object_name.lower()),
+            "admin/%s/delete_selected_confirmation.html" % app_label,
+            "admin/delete_selected_confirmation.html"
+        ], context, context_instance=template.RequestContext(request))
+            
     delete_selected.short_description = ugettext_lazy("Delete selected %(verbose_name_plural)s")
     
     def construct_change_message(self, request, form, formsets):
