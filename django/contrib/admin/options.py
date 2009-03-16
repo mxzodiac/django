@@ -713,7 +713,7 @@ class ModelAdmin(BaseModelAdmin):
         FormSet = self.get_changelist_formset(request)
         
         if request.method == "POST" and self.list_editable:
-            formset = FormSet(request.POST, queryset=cl.result_list)
+            formset = FormSet(request.POST, request.FILES, queryset=cl.result_list)
             if formset.is_valid():
                 for form in formset.forms:
                     obj = self.save_form(request, form, change=True)
