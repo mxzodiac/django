@@ -61,7 +61,7 @@
                 {% endif %}
             {% endblock %}
             {% if formset %}
-                <form action="" method="post">
+                <form action="" method="post"{% if formset.is_multipart %} enctype="multipart/form-data"{% endif %}>
                 {{ formset.management_form }}
             {% endif %}
 
