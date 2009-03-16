@@ -33,6 +33,8 @@ class BaseDatabaseCreation(object):
         from django.db import models
 
         opts = model._meta
+        if not opts.managed:
+            return [], {}
         final_output = []
         table_output = []
         pending_references = {}
@@ -112,6 +114,8 @@ class BaseDatabaseCreation(object):
         "Returns any ALTER TABLE statements to add constraints after the fact."
         from django.db.backends.util import truncate_name
 
+        if not model._meta.managed:
+            return []
         qn = self.connection.ops.quote_name
         final_output = []
         opts = model._meta
@@ -225,6 +229,8 @@ class BaseDatabaseCreation(object):
 
     def sql_indexes_for_model(self, model, style):
         "Returns the CREATE INDEX SQL statements for a single model"
+        if not model._meta.managed:
+            return []
         output = []
         for f in model._meta.local_fields:
             output.extend(self.sql_indexes_for_field(model, f, style))
@@ -255,6 +261,8 @@ class BaseDatabaseCreation(object):
 
     def sql_destroy_model(self, model, references_to_delete, style):
         "Return the DROP TABLE and restraint dropping statements for a single model"
+        if not model._meta.managed:
+            return []
         # Drop the table now
         qn = self.connection.ops.quote_name
         output = ['%s %s;' % (style.SQL_KEYWORD('DROP TABLE'),
@@ -271,6 +279,8 @@ class BaseDatabaseCreation(object):
     def sql_remove_table_constraints(self, model, references_to_delete, style):
         from django.db.backends.util import truncate_name
 
+        if not model._meta.managed:
+            return []
         output = []
         qn = self.connection.ops.quote_name
         for rel_class, f in references_to_delete[model]:
@@ -311,7 +321,10 @@ class BaseDatabaseCreation(object):
 
         self.connection.close()
         settings.DATABASE_NAME = test_database_name
-        settings.DATABASE_SUPPORTS_TRANSACTIONS = self._rollback_works()
+        self.connection.settings_dict["DATABASE_NAME"] = test_database_name
+        can_rollback = self._rollback_works()
+        settings.DATABASE_SUPPORTS_TRANSACTIONS = can_rollback
+        self.connection.settings_dict["DATABASE_SUPPORTS_TRANSACTIONS"] = can_rollback
 
         call_command('syncdb', verbosity=verbosity, interactive=False)
 
@@ -387,6 +400,7 @@ class BaseDatabaseCreation(object):
         self.connection.close()
         test_database_name = settings.DATABASE_NAME
         settings.DATABASE_NAME = old_database_name
+        self.connection.settings_dict["DATABASE_NAME"] = old_database_name
 
         self._destroy_test_db(test_database_name, verbosity)
 
