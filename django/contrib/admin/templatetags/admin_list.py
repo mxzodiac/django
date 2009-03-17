@@ -25,7 +25,7 @@ def paginator_number(cl,i):
         return mark_safe(u'<a href="%s"%s>%d</a> ' % (cl.get_query_string({PAGE_VAR: i}), (i == cl.paginator.num_pages-1 and ' class="end"' or ''), i+1))
 paginator_number = register.simple_tag(paginator_number)
 
-def pagination(cl, formset):
+def pagination(cl):
     paginator, page_num = cl.paginator, cl.page_num
 
     pagination_required = (not cl.show_all or not cl.can_show_all) and cl.multi_page
@@ -65,7 +65,6 @@ def pagination(cl, formset):
         'page_range': page_range,
         'ALL_VAR': ALL_VAR,
         '1': 1,
-        'formset': formset,
     }
 pagination = register.inclusion_tag('admin/pagination.html')(pagination)
 
@@ -245,10 +244,10 @@ def results(cl, formset):
         for res in cl.result_list:
             yield list(items_for_result(cl, res, None))
 
-def result_list(cl, formset):
+def result_list(cl):
     return {'cl': cl,
             'result_headers': list(result_headers(cl)),
-            'results': list(results(cl, formset))}
+            'results': list(results(cl, cl.formset))}
 result_list = register.inclusion_tag("admin/change_list_results.html")(result_list)
 
 def date_hierarchy(cl):

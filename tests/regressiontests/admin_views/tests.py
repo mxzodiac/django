@@ -741,7 +741,7 @@ class AdminViewListEditable(TestCase):
     
     def test_changelist_input_html(self):
         response = self.client.get('/test_admin/admin/admin_views/person/')
-        self.failUnlessEqual(response.content.count("<input"), 9,)
+        self.failUnlessEqual(response.content.count("<input"), 11)
         self.failUnlessEqual(response.content.count("<select"), 3)
     
     def test_post_submission(self):
@@ -755,7 +755,7 @@ class AdminViewListEditable(TestCase):
             "form-1-gender": "2",
             "form-1-id": "2",
             
-            "form-2-alive": "",
+            "form-2-alive": "checked",
             "form-2-gender": "1",
             "form-2-id": "3",
         }
@@ -763,6 +763,35 @@ class AdminViewListEditable(TestCase):
 
         self.failUnlessEqual(Person.objects.get(name="John Mauchly").alive, False)
         self.failUnlessEqual(Person.objects.get(name="Grace Hooper").gender, 2)
+        
+        # test a filtered page
+        data = {
+            "form-TOTAL_FORMS": "2",
+            "form-INITIAL_FORMS": "2",
+            
+            "form-0-id": "1",
+            "form-0-gender": "1",
+            "form-0-alive": "checked",
+            
+            "form-1-id": "3",
+            "form-1-gender": "1",
+            "form-1-alive": "checked",
+        }
+        self.client.post('/test_admin/admin/admin_views/person/?gender__exact=1', data)
+        
+        self.failUnlessEqual(Person.objects.get(name="John Mauchly").alive, True)
+        
+        # test a searched page
+        data = {
+            "form-TOTAL_FORMS": "1",
+            "form-INITIAL_FORMS": "1",
+            
+            "form-0-id": "1",
+            "form-0-gender": "1"
+        }
+        self.client.post('/test_admin/admin/admin_views/person/?q=mauchly', data)
+        
+        self.failUnlessEqual(Person.objects.get(name="John Mauchly").alive, False)
 
 class AdminInheritedInlinesTest(TestCase):
     fixtures = ['admin-views-users.xml',]

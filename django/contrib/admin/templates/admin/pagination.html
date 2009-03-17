@@ -1,7 +1,7 @@
 {% load admin_list %}
 {% load i18n %}
 <p class="paginator">
-{% if formset %}
+{% if cl.formset %}
     <input type="submit" name="_save" class="default" value="Save"/>
 {% endif %}
 {% if pagination_required %}

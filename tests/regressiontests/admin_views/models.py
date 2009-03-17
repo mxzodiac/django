@@ -143,12 +143,17 @@ class Person(models.Model):
     gender = models.IntegerField(choices=GENDER_CHOICES)
     alive = models.BooleanField()
     
+    def __unicode__(self):
+        return self.name
+    
     class Meta:
         ordering = ["id"]
 
 class PersonAdmin(admin.ModelAdmin):
     list_display = ('name', 'gender', 'alive')
     list_editable = ('gender', 'alive')
+    list_filter = ('gender',)
+    search_fields = ('name',)
     ordering = ["id"]
 
 class Persona(models.Model):

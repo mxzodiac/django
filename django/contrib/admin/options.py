@@ -315,6 +315,9 @@ class ModelAdmin(BaseModelAdmin):
         return modelform_factory(self.model, **defaults)
     
     def get_changelist_form(self, request, **kwargs):
+        """
+        Returns a Form class for use in the Formset on the changelist page.
+        """
         defaults = {
             "formfield_callback": curry(self.formfield_for_dbfield, 
                 request=request),
@@ -323,6 +326,10 @@ class ModelAdmin(BaseModelAdmin):
         return modelform_factory(self.model, **defaults)
     
     def get_changelist_formset(self, request, **kwargs):
+        """
+        Returns a FormSet class for use on the changelist page if list_editable 
+        is used.
+        """
         return modelformset_factory(self.model, 
             self.get_changelist_form(request), extra=0, 
             fields=self.list_editable)
@@ -710,10 +717,9 @@ class ModelAdmin(BaseModelAdmin):
                 return render_to_response('admin/invalid_setup.html', {'title': _('Database error')})
             return HttpResponseRedirect(request.path + '?' + ERROR_FLAG + '=1')
         
-        FormSet = self.get_changelist_formset(request)
-        
         if request.method == "POST" and self.list_editable:
-            formset = FormSet(request.POST, queryset=cl.result_list)
+            FormSet = self.get_changelist_formset(request)
+            formset = FormSet(request.POST, request.FILES, queryset=cl.result_list)
             if formset.is_valid():
                 for form in formset.forms:
                     obj = self.save_form(request, form, change=True)
@@ -723,15 +729,16 @@ class ModelAdmin(BaseModelAdmin):
                     self.log_change(request, obj, change_msg)
                 return HttpResponseRedirect(request.get_full_path())
         elif self.list_editable:
+            FormSet = self.get_changelist_formset(request)
             formset = FormSet(queryset=cl.result_list)
         else:
             formset = None
+        cl.formset = formset
 
         context = {
             'title': cl.title,
             'is_popup': cl.is_popup,
             'cl': cl,
-            'formset': formset,
             'has_add_permission': self.has_add_permission(request),
             'root_path': self.admin_site.root_path,
             'app_label': app_label,
