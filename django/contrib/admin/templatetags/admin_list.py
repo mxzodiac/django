@@ -229,7 +229,7 @@ def items_for_result(cl, result, form):
         else:
             # by default the fields come from ModelAdmin.list_editable, however 
             # this way users can provide custom fields on a per request basis
-            if field_name in form.fields:
+            if form and field_name in form.fields:
                 bf = form[field_name]
                 result_repr = mark_safe(force_unicode(bf.errors) + force_unicode(bf))
             else:
