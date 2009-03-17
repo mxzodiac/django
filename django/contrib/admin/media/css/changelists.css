@@ -53,8 +53,19 @@
     vertical-align: middle;
 }
 
+#changelist table thead th:first-child {
+    width: 1.5em;
+    text-align: center;
+}
+
 #changelist table tbody td {
     border-left: 1px solid #ddd;
+}
+
+#changelist table tbody td:first-child {
+    border-left: 0;
+    border-right: 1px solid #ddd;
+    text-align: center;
 }
 
 #changelist table tfoot {
@@ -210,47 +221,35 @@
     border-color: #036;
 }
 
-.filtered #action-form .actions {
+/* ACTIONS */
+
+.filtered .actions {
     margin-right: 160px !important;
     border-right: 1px solid #ddd;
 }
 
-#action-form .actions {
+#changelist .actions {
     color: #666;
     padding: 3px;
-    font-weight: bold;
-    background: #efefef url(../img/admin/nav-bg.gif);
+    border-bottom: 1px solid #ddd;
+    background: #e1e1e1 url(../img/admin/nav-bg.gif) top left repeat-x;
 }
 
-#action-form .actions:last-child {
+#changelist .actions:last-child {
     border-bottom: none;
 }
 
-#action-form .actions select {
+#changelist .actions select {
     border: 1px solid #aaa;
+    margin: 0 0.5em;
+    padding: 1px 2px;
+}
+
+#changelist .actions label {
+    font-size: 11px;
     margin: 0 0.5em;
 }
 
-#action-toggle {
+#changelist #action-toggle {
     display: none;
-}
-
-#action-form .actions label {
-    font-size: 11px;
-    margin-left: 0.5em;
-}
-
-#action-form tbody tr input.action-select {
-    margin: 0;
-}
-
-#action-form thead th:first-child {
-    width: 1.5em;
-    text-align: center;
-}
-
-#action-form tbody td:first-child {
-    border-left: 0;
-    border-right: 1px solid #ddd;
-    text-align: center;
 }

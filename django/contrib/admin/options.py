@@ -919,8 +919,8 @@ class ModelAdmin(BaseModelAdmin):
         if formset:
             media = self.media + formset.media
         else:
-            media = None
-
+            media = self.media
+        
         context = {
             'title': cl.title,
             'is_popup': cl.is_popup,
