@@ -717,6 +717,9 @@ class ModelAdmin(BaseModelAdmin):
                 return render_to_response('admin/invalid_setup.html', {'title': _('Database error')})
             return HttpResponseRedirect(request.path + '?' + ERROR_FLAG + '=1')
         
+        # If we're allowing changelist editing, we need to construct a formset
+        # for the changelist given all the fields to be edited. Then we'll
+        # use the formset to validate/process POSTed data.
         if request.method == "POST" and self.list_editable:
             FormSet = self.get_changelist_formset(request)
             formset = FormSet(request.POST, request.FILES, queryset=cl.result_list)
