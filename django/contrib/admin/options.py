@@ -16,6 +16,7 @@ from django.utils.safestring import mark_safe
 from django.utils.functional import curry
 from django.utils.text import capfirst, get_text_list
 from django.utils.translation import ugettext as _
+from django.utils.translation import ngettext
 from django.utils.encoding import force_unicode
 try:
     set
@@ -723,26 +724,42 @@ class ModelAdmin(BaseModelAdmin):
         # If we're allowing changelist editing, we need to construct a formset
         # for the changelist given all the fields to be edited. Then we'll
         # use the formset to validate/process POSTed data.
+        formset = cl.formset = None
+        
+        # Handle POSTed bulk-edit data.
         if request.method == "POST" and self.list_editable:
             FormSet = self.get_changelist_formset(request)
-            formset = FormSet(request.POST, request.FILES, queryset=cl.result_list)
+            formset = cl.formset = FormSet(request.POST, request.FILES, queryset=cl.result_list)
             if formset.is_valid():
+                changecount = 0
                 for form in formset.forms:
                     obj = self.save_form(request, form, change=True)
                     self.save_model(request, obj, form, change=True)
                     form.save_m2m()
                     change_msg = self.construct_change_message(request, form, None)
                     self.log_change(request, obj, change_msg)
+                    changecount += 1
+                
+                msg = ngettext("%(count)s %(singular)s was changed successfully", 
+                               "%(count)s %(plural)s were changed successfully", 
+                               changecount) % {'count': changecount,
+                                               'singular': force_unicode(opts.verbose_name), 
+                                               'plural': force_unicode(opts.verbose_name_plural),
+                                               'obj': force_unicode(obj)}
+                self.message_user(request, msg)
+            
                 return HttpResponseRedirect(request.get_full_path())
+        
+        # Handle GET -- construct a formset for display.
         elif self.list_editable:
             FormSet = self.get_changelist_formset(request)
-            formset = FormSet(queryset=cl.result_list)
-        else:
-            formset = None
-        cl.formset = formset
-        media = self.media
+            formset = cl.formset = FormSet(queryset=cl.result_list)
+        
+        # Build the list of media to be used by the formset.
         if formset:
-            media += formset.media
+            media = self.media + formset.media
+        else:
+            media = None
 
         context = {
             'title': cl.title,
