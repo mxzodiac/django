@@ -836,7 +836,15 @@ class AdminActionsTest(TestCase):
             'action' : 'delete_selected',
             'index': 0,
         }
-        response = self.client.post('/test_admin/admin/admin_views/subscriber/', action_data)
+        delete_confirmation_data = {
+            ACTION_CHECKBOX_NAME: [1, 2],
+            'action' : 'delete_selected',
+            'index': 0,
+            'post': 'yes',
+        }
+        confirmation = self.client.post('/test_admin/admin/admin_views/subscriber/', action_data)
+        self.assertContains(confirmation, "Are you sure you want to delete the selected subscriber objects")
+        response = self.client.post('/test_admin/admin/admin_views/subscriber/', delete_confirmation_data)
         self.failUnlessEqual(Subscriber.objects.count(), 0)
 
     def test_custom_model_instance_action(self):
