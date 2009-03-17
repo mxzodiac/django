@@ -6,6 +6,7 @@
   <link rel="stylesheet" type="text/css" href="{% admin_media_prefix %}css/changelists.css" />
   {% if cl.formset %}
     <link rel="stylesheet" type="text/css" href="{% admin_media_prefix %}css/forms.css" />
+    {{ cl.formset.media }}
   {% endif %}
 {% endblock %}
 
