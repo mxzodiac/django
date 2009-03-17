@@ -645,7 +645,7 @@ class ModelAdmin(BaseModelAdmin):
             self.message_user(request, msg)
             return HttpResponseRedirect("../")
 
-    def response_action(self, request, changelist):
+    def response_action(self, request, queryset):
         if request.method == 'POST':
             # There can be multiple action forms on the page (at the top
             # and bottom of the change list, for example). Get the action
@@ -665,7 +665,7 @@ class ModelAdmin(BaseModelAdmin):
                 action = action_form.cleaned_data['action']
                 func, name, description, instance_action = self.get_action(action)
                 selected = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
-                results = changelist.get_query_set().filter(pk__in=selected)
+                results = queryset.filter(pk__in=selected)
                 response = None
                 if callable(func):
                     if instance_action:
@@ -875,9 +875,9 @@ class ModelAdmin(BaseModelAdmin):
                 return render_to_response('admin/invalid_setup.html', {'title': _('Database error')})
             return HttpResponseRedirect(request.path + '?' + ERROR_FLAG + '=1')
         
-        action_response = self.response_action(request, cl)
-        if isinstance(action_response, HttpResponse):
-            return action_response
+        action_form_or_response = self.response_action(request, queryset=cl.get_query_set())
+        if isinstance(action_form_or_response, HttpResponse):
+            return action_form_or_response
         
         # If we're allowing changelist editing, we need to construct a formset
         # for the changelist given all the fields to be edited. Then we'll
@@ -929,7 +929,7 @@ class ModelAdmin(BaseModelAdmin):
             'has_add_permission': self.has_add_permission(request),
             'root_path': self.admin_site.root_path,
             'app_label': app_label,
-            'action_form': action_response,
+            'action_form': action_form_or_response,
             'actions_on_top': self.actions_on_top,
             'actions_on_bottom': self.actions_on_bottom,
         }
