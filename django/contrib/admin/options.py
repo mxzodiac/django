@@ -740,11 +740,15 @@ class ModelAdmin(BaseModelAdmin):
         else:
             formset = None
         cl.formset = formset
+        media = self.media
+        if formset:
+            media += formset.media
 
         context = {
             'title': cl.title,
             'is_popup': cl.is_popup,
             'cl': cl,
+            'media': media,
             'has_add_permission': self.has_add_permission(request),
             'root_path': self.admin_site.root_path,
             'app_label': app_label,
