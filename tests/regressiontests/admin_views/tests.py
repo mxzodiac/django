@@ -742,7 +742,13 @@ class AdminViewListEditable(TestCase):
     
     def test_changelist_input_html(self):
         response = self.client.get('/test_admin/admin/admin_views/person/')
+        # 2 inputs per object(the field and the hidden id field) = 6
+        # 2 management hidden fields = 2
+        # main form submit button = 1
+        # search field and search submit button = 2
+        # 6 + 2 + 1 + 2 = 11 inputs
         self.failUnlessEqual(response.content.count("<input"), 11)
+        # 1 select per object = 3 selects
         self.failUnlessEqual(response.content.count("<select"), 3)
     
     def test_post_submission(self):
