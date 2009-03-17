@@ -239,9 +239,9 @@ def items_for_result(cl, result, form):
     if form:
         yield mark_safe(force_unicode(form[cl.model._meta.pk.attname]))
 
-def results(cl, formset):
-    if formset:
-        for res, form in zip(cl.result_list, formset.forms):
+def results(cl):
+    if cl.formset:
+        for res, form in zip(cl.result_list, cl.formset.forms):
             yield list(items_for_result(cl, res, form))
     else:
         for res in cl.result_list:
@@ -250,7 +250,7 @@ def results(cl, formset):
 def result_list(cl):
     return {'cl': cl,
             'result_headers': list(result_headers(cl)),
-            'results': list(results(cl, cl.formset))}
+            'results': list(results(cl))}
 result_list = register.inclusion_tag("admin/change_list_results.html")(result_list)
 
 def date_hierarchy(cl):
