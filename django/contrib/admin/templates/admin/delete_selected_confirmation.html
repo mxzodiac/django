@@ -4,7 +4,7 @@
 {% block breadcrumbs %}
 <div class="breadcrumbs">
      <a href="../../">{% trans "Home" %}</a> &rsaquo;
-     <a href="../">{{ app_label|capfirst }}</a> &rsaquo; 
+     <a href="../">{{ app_label|capfirst }}</a> &rsaquo;
      <a href="./">{{ opts.verbose_name_plural|capfirst }}</a> &rsaquo;
      {% trans 'Delete multiple objects' %}
 </div>
@@ -22,8 +22,8 @@
     <p>{% blocktrans %}Are you sure you want to delete the selected {{ object_name }} objects? All of the following objects and it's related items will be deleted:{% endblocktrans %}</p>
     {% for d in deleted_objects %}
         <ul>{{ d|unordered_list }}</ul>
-    {% endfor %}    
-    <form action="" method="post">    
+    {% endfor %}
+    <form action="" method="post">
     <div>
     {% for s in selected %}
     <input type="hidden" name="selected" value="{{ s.pk }}" />

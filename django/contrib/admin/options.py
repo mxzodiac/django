@@ -433,7 +433,7 @@ class ModelAdmin(BaseModelAdmin):
         
         if not self.has_delete_permission(request):
             raise PermissionDenied
-                    
+        
         # Populate deleted_objects, a data structure of all related objects that
         # will also be deleted.
         
@@ -442,12 +442,11 @@ class ModelAdmin(BaseModelAdmin):
         for obj in selected:
             deleted_objects.append([mark_safe(u'%s: <a href="%s/">%s</a>' % (escape(force_unicode(capfirst(opts.verbose_name))), obj.pk, escape(obj))), []])
         perms_needed = set()
-        
         i = 0
         for d in deleted_objects:
             # FIXME: the urlpath to the detail-view of the related objects are hardcoded as "../../../../"
-            #        which is wrong from this changelist_view. Is there a admin-reverse-urlconf refactor?
-            get_deleted_objects(deleted_objects[i], perms_needed, request.user, selected[i], opts, 1, self.admin_site)      
+            # which is wrong from this changelist_view. Is there a admin-reverse-urlconf refactor?
+            get_deleted_objects(deleted_objects[i], perms_needed, request.user, selected[i], opts, 1, self.admin_site)
             i=i+1
         
         # The user has already confirmed the deletion.
@@ -475,13 +474,12 @@ class ModelAdmin(BaseModelAdmin):
             "root_path": self.admin_site.root_path,
             "app_label": app_label,
         }
-        
         return render_to_response(self.delete_confirmation_template or [
             "admin/%s/%s/delete_selected_confirmation.html" % (app_label, opts.object_name.lower()),
             "admin/%s/delete_selected_confirmation.html" % app_label,
             "admin/delete_selected_confirmation.html"
         ], context, context_instance=template.RequestContext(request))
-            
+    
     delete_selected.short_description = ugettext_lazy("Delete selected %(verbose_name_plural)s")
     
     def construct_change_message(self, request, form, formsets):
