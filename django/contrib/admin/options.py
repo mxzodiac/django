@@ -108,7 +108,7 @@ class BaseModelAdmin(object):
         if db_field.__class__ in self.formfield_overrides:
             kwargs = dict(self.formfield_overrides[db_field.__class__], **kwargs)
             return db_field.formfield(**kwargs)
-                        
+            
         # For any other type of field, just call its formfield() method.
         return db_field.formfield(**kwargs)
         
@@ -319,8 +319,7 @@ class ModelAdmin(BaseModelAdmin):
         Returns a Form class for use in the Formset on the changelist page.
         """
         defaults = {
-            "formfield_callback": curry(self.formfield_for_dbfield, 
-                request=request),
+            "formfield_callback": curry(self.formfield_for_dbfield, request=request),
         }
         defaults.update(kwargs)
         return modelform_factory(self.model, **defaults)
@@ -330,9 +329,13 @@ class ModelAdmin(BaseModelAdmin):
         Returns a FormSet class for use on the changelist page if list_editable 
         is used.
         """
+        defaults = {
+            "formfield_callback": curry(self.formfield_for_dbfield, request=request),
+        }
+        defaults.update(kwargs)
         return modelformset_factory(self.model, 
             self.get_changelist_form(request), extra=0, 
-            fields=self.list_editable)
+            fields=self.list_editable, **defaults)
     
     def get_formsets(self, request, obj=None):
         for inline in self.inline_instances:
