@@ -135,6 +135,28 @@ class Thing(models.Model):
 class ThingAdmin(admin.ModelAdmin):
     list_filter = ('color',)
 
+class Person(models.Model):
+    GENDER_CHOICES = (
+        (1, "Male"),
+        (2, "Female"),
+    )
+    name = models.CharField(max_length=100)
+    gender = models.IntegerField(choices=GENDER_CHOICES)
+    alive = models.BooleanField()
+    
+    def __unicode__(self):
+        return self.name
+    
+    class Meta:
+        ordering = ["id"]
+
+class PersonAdmin(admin.ModelAdmin):
+    list_display = ('name', 'gender', 'alive')
+    list_editable = ('gender', 'alive')
+    list_filter = ('gender',)
+    search_fields = ('name',)
+    ordering = ["id"]
+
 class Persona(models.Model):
     """
     A simple persona associated with accounts, to test inlining of related
@@ -234,6 +256,7 @@ admin.site.register(Section, inlines=[ArticleInline])
 admin.site.register(ModelWithStringPrimaryKey)
 admin.site.register(Color)
 admin.site.register(Thing, ThingAdmin)
+admin.site.register(Person, PersonAdmin)
 admin.site.register(Persona, PersonaAdmin)
 admin.site.register(Subscriber, SubscriberAdmin)
 admin.site.register(DirectSubscriber, DirectSubscriberAdmin)
