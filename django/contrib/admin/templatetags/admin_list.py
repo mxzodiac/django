@@ -227,8 +227,9 @@ def items_for_result(cl, result, form):
             yield mark_safe(u'<%s%s><a href="%s"%s>%s</a></%s>' % \
                 (table_tag, row_class, url, (cl.is_popup and ' onclick="opener.dismissRelatedLookupPopup(window, %s); return false;"' % result_id or ''), conditional_escape(result_repr), table_tag))
         else:
-            # by default the fields come from ModelAdmin.list_editable, however 
-            # this way users can provide custom fields on a per request basis
+            # By default the fields come from ModelAdmin.list_editable, but if we pull
+            # the fields out of the form instead of list_editable custom admins
+            # can provide fields on a per request basis
             if form and field_name in form.fields:
                 bf = form[field_name]
                 result_repr = mark_safe(force_unicode(bf.errors) + force_unicode(bf))
@@ -238,9 +239,9 @@ def items_for_result(cl, result, form):
     if form:
         yield mark_safe(force_unicode(form[cl.model._meta.pk.attname]))
 
-def results(cl, formset):
-    if formset:
-        for res, form in zip(cl.result_list, formset.forms):
+def results(cl):
+    if cl.formset:
+        for res, form in zip(cl.result_list, cl.formset.forms):
             yield list(items_for_result(cl, res, form))
     else:
         for res in cl.result_list:
@@ -249,7 +250,7 @@ def results(cl, formset):
 def result_list(cl):
     return {'cl': cl,
             'result_headers': list(result_headers(cl)),
-            'results': list(results(cl, cl.formset))}
+            'results': list(results(cl))}
 result_list = register.inclusion_tag("admin/change_list_results.html")(result_list)
 
 def date_hierarchy(cl):

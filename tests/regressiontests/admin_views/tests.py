@@ -18,7 +18,6 @@ try:
 except NameError:
     from sets import Set as set
 
-
 class AdminViewBasicTest(TestCase):
     fixtures = ['admin-views-users.xml', 'admin-views-colors.xml']
 
