@@ -60,6 +60,13 @@ def _nest_help(obj, depth, val):
         current = current[-1]
     current.append(val)
 
+def get_change_view_url(app_label, module_name, pk):
+    """
+    Returns the url to the admin change view for the given app_label,
+    model_name and primary key
+    """
+    return '../../../../%s/%s/%s/' % (app_label, module_name, pk)
+
 def get_deleted_objects(deleted_objects, perms_needed, user, obj, opts, current_depth, admin_site):
     "Helper function that recursively populates deleted_objects."
     nh = _nest_help # Bind to local variable for performance
@@ -91,11 +98,11 @@ def get_deleted_objects(deleted_objects, perms_needed, user, obj, opts, current_
                         [u'%s: %s' % (capfirst(related.opts.verbose_name), force_unicode(sub_obj)), []])
                 else:
                     # Display a link to the admin page.
-                    nh(deleted_objects, current_depth, [mark_safe(u'%s: <a href="../../../../%s/%s/%s/">%s</a>' %
+                    nh(deleted_objects, current_depth, [mark_safe(u'%s: <a href="%s">%s</a>' %
                         (escape(capfirst(related.opts.verbose_name)),
-                        related.opts.app_label,
-                        related.opts.object_name.lower(),
-                        sub_obj._get_pk_val(),
+                        get_change_view_url(related.opts.app_label,
+                                            related.opts.object_name.lower(),
+                                            sub_obj._get_pk_val()),
                         escape(sub_obj))), []])
                 get_deleted_objects(deleted_objects, perms_needed, user, sub_obj, related.opts, current_depth+2, admin_site)
         else:
@@ -109,11 +116,11 @@ def get_deleted_objects(deleted_objects, perms_needed, user, obj, opts, current_
                         [u'%s: %s' % (capfirst(related.opts.verbose_name), force_unicode(sub_obj)), []])
                 else:
                     # Display a link to the admin page.
-                    nh(deleted_objects, current_depth, [mark_safe(u'%s: <a href="../../../../%s/%s/%s/">%s</a>' % 
+                    nh(deleted_objects, current_depth, [mark_safe(u'%s: <a href="%s">%s</a>' %
                         (escape(capfirst(related.opts.verbose_name)),
-                        related.opts.app_label,
-                        related.opts.object_name.lower(),
-                        sub_obj._get_pk_val(),
+                        get_change_view_url(related.opts.app_label,
+                                            related.opts.object_name.lower(),
+                                            sub_obj._get_pk_val()),
                         escape(sub_obj))), []])
                 get_deleted_objects(deleted_objects, perms_needed, user, sub_obj, related.opts, current_depth+2, admin_site)
             # If there were related objects, and the user doesn't have
@@ -147,8 +154,11 @@ def get_deleted_objects(deleted_objects, perms_needed, user, obj, opts, current_
                     # Display a link to the admin page.
                     nh(deleted_objects, current_depth, [
                         mark_safe((_('One or more %(fieldname)s in %(name)s:') % {'fieldname': escape(force_unicode(related.field.verbose_name)), 'name': escape(force_unicode(related.opts.verbose_name))}) + \
-                        (u' <a href="../../../../%s/%s/%s/">%s</a>' % \
-                            (related.opts.app_label, related.opts.module_name, sub_obj._get_pk_val(), escape(sub_obj)))), []])
+                        (u' <a href="%s">%s</a>' % \
+                            (get_change_view_url(related.opts.app_label,
+                                                 related.opts.object_name.lower(),
+                                                 sub_obj._get_pk_val()),
+                            escape(sub_obj)))), []])
         # If there were related objects, and the user doesn't have
         # permission to change them, add the missing perm to perms_needed.
         if has_admin and has_related_objs:
