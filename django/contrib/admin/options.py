@@ -464,14 +464,13 @@ class ModelAdmin(BaseModelAdmin):
 
         # deleted_objects must be a list if we want to use '|unordered_list' in the template
         deleted_objects = []
-        for obj in selected:
-            deleted_objects.append([mark_safe(u'%s: <a href="%s/">%s</a>' % (escape(force_unicode(capfirst(opts.verbose_name))), obj.pk, escape(obj))), []])
         perms_needed = set()
         i = 0
-        for d in deleted_objects:
+        for obj in selected:
+            deleted_objects.append([mark_safe(u'%s: <a href="%s/">%s</a>' % (escape(force_unicode(capfirst(opts.verbose_name))), obj.pk, escape(obj))), []])
             # FIXME: the urlpath to the detail-view of the related objects are hardcoded as "../../../../"
             # which is wrong from this changelist_view. Is there a admin-reverse-urlconf refactor?
-            get_deleted_objects(deleted_objects[i], perms_needed, request.user, selected[i], opts, 1, self.admin_site)
+            get_deleted_objects(deleted_objects[i], perms_needed, request.user, obj, opts, 1, self.admin_site, 2)
             i=i+1
 
         # The user has already confirmed the deletion.
