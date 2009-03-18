@@ -60,15 +60,23 @@ def _nest_help(obj, depth, val):
         current = current[-1]
     current.append(val)
 
-def get_change_view_url(app_label, module_name, pk):
+def get_change_view_url(app_label, module_name, pk, parents_to_home):
     """
     Returns the url to the admin change view for the given app_label,
-    model_name and primary key
+    module_name and primary key. `parents_to_home` defines the count
+    of parent directories (../) to the admin home.
     """
-    return '../../../../%s/%s/%s/' % (app_label, module_name, pk)
+    return '%s%s/%s/%s/' % ('../'*parents_to_home, app_label, module_name, pk)
 
-def get_deleted_objects(deleted_objects, perms_needed, user, obj, opts, current_depth, admin_site):
-    "Helper function that recursively populates deleted_objects."
+def get_deleted_objects(deleted_objects, perms_needed, user, obj, opts, current_depth, admin_site, parents_to_home=4):
+    """
+    Helper function that recursively populates deleted_objects.
+
+    `parents_to_home` defines the count of parent directories (../)
+    to the admin home. From a change_view this is 4, from a change_list
+    view 2. This is for backwards compatibility as options.delete_selected
+    function uses this function also from a change_list view.
+    """
     nh = _nest_help # Bind to local variable for performance
     if current_depth > 16:
         return # Avoid recursing too deep.
@@ -102,7 +110,8 @@ def get_deleted_objects(deleted_objects, perms_needed, user, obj, opts, current_
                         (escape(capfirst(related.opts.verbose_name)),
                         get_change_view_url(related.opts.app_label,
                                             related.opts.object_name.lower(),
-                                            sub_obj._get_pk_val()),
+                                            sub_obj._get_pk_val(),
+                                            parents_to_home),
                         escape(sub_obj))), []])
                 get_deleted_objects(deleted_objects, perms_needed, user, sub_obj, related.opts, current_depth+2, admin_site)
         else:
@@ -120,7 +129,8 @@ def get_deleted_objects(deleted_objects, perms_needed, user, obj, opts, current_
                         (escape(capfirst(related.opts.verbose_name)),
                         get_change_view_url(related.opts.app_label,
                                             related.opts.object_name.lower(),
-                                            sub_obj._get_pk_val()),
+                                            sub_obj._get_pk_val(),
+                                            parents_to_home),
                         escape(sub_obj))), []])
                 get_deleted_objects(deleted_objects, perms_needed, user, sub_obj, related.opts, current_depth+2, admin_site)
             # If there were related objects, and the user doesn't have
@@ -157,7 +167,8 @@ def get_deleted_objects(deleted_objects, perms_needed, user, obj, opts, current_
                         (u' <a href="%s">%s</a>' % \
                             (get_change_view_url(related.opts.app_label,
                                                  related.opts.object_name.lower(),
-                                                 sub_obj._get_pk_val()),
+                                                 sub_obj._get_pk_val(),
+                                                 parents_to_home),
                             escape(sub_obj)))), []])
         # If there were related objects, and the user doesn't have
         # permission to change them, add the missing perm to perms_needed.
