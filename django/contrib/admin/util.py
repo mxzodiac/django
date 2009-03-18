@@ -5,6 +5,7 @@ from django.utils.safestring import mark_safe
 from django.utils.text import capfirst
 from django.utils.encoding import force_unicode
 from django.utils.translation import ungettext, ugettext as _
+from django.core.urlresolvers import reverse, NoReverseMatch
 
 def quote(s):
     """
@@ -63,10 +64,12 @@ def _nest_help(obj, depth, val):
 def get_change_view_url(app_label, module_name, pk, parents_to_home):
     """
     Returns the url to the admin change view for the given app_label,
-    module_name and primary key. `parents_to_home` defines the count
-    of parent directories (../) to the admin home.
+    module_name and primary key.
     """
-    return '%s%s/%s/%s/' % ('../'*parents_to_home, app_label, module_name, pk)
+    try:
+        return reverse('admin_%s_%s_change' % (app_label, module_name), None, (pk,))
+    except NoReverseMatch:
+        return '%s%s/%s/%s/' % ('../'*parents_to_home, app_label, module_name, pk)
 
 def get_deleted_objects(deleted_objects, perms_needed, user, obj, opts, current_depth, admin_site, parents_to_home=4):
     """
@@ -76,6 +79,7 @@ def get_deleted_objects(deleted_objects, perms_needed, user, obj, opts, current_
     to the admin home. From a change_view this is 4, from a change_list
     view 2. This is for backwards compatibility as options.delete_selected
     function uses this function also from a change_list view.
+    This is will not be used if we can get the url via urlresolver.
     """
     nh = _nest_help # Bind to local variable for performance
     if current_depth > 16:
