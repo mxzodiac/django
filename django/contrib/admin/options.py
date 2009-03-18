@@ -468,8 +468,6 @@ class ModelAdmin(BaseModelAdmin):
         i = 0
         for obj in selected:
             deleted_objects.append([mark_safe(u'%s: <a href="%s/">%s</a>' % (escape(force_unicode(capfirst(opts.verbose_name))), obj.pk, escape(obj))), []])
-            # FIXME: the urlpath to the detail-view of the related objects are hardcoded as "../../../../"
-            # which is wrong from this changelist_view. Is there a admin-reverse-urlconf refactor?
             get_deleted_objects(deleted_objects[i], perms_needed, request.user, obj, opts, 1, self.admin_site, parents_to_home=2)
             i=i+1
 
