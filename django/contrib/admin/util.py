@@ -61,13 +61,13 @@ def _nest_help(obj, depth, val):
         current = current[-1]
     current.append(val)
 
-def get_change_view_url(app_label, module_name, pk, levels_to_root):
+def get_change_view_url(app_label, module_name, pk, admin_site, levels_to_root):
     """
     Returns the url to the admin change view for the given app_label,
     module_name and primary key.
     """
     try:
-        return reverse('admin_%s_%s_change' % (app_label, module_name), None, (pk,))
+        return reverse('%sadmin_%s_%s_change' % (admin_site.name, app_label, module_name), None, (pk,))
     except NoReverseMatch:
         return '%s%s/%s/%s/' % ('../'*levels_to_root, app_label, module_name, pk)
 
@@ -116,6 +116,7 @@ def get_deleted_objects(deleted_objects, perms_needed, user, obj, opts, current_
                         get_change_view_url(related.opts.app_label,
                                             related.opts.object_name.lower(),
                                             sub_obj._get_pk_val(),
+                                            admin_site,
                                             levels_to_root),
                         escape(sub_obj))), []])
                 get_deleted_objects(deleted_objects, perms_needed, user, sub_obj, related.opts, current_depth+2, admin_site)
@@ -135,6 +136,7 @@ def get_deleted_objects(deleted_objects, perms_needed, user, obj, opts, current_
                         get_change_view_url(related.opts.app_label,
                                             related.opts.object_name.lower(),
                                             sub_obj._get_pk_val(),
+                                            admin_site,
                                             levels_to_root),
                         escape(sub_obj))), []])
                 get_deleted_objects(deleted_objects, perms_needed, user, sub_obj, related.opts, current_depth+2, admin_site)
@@ -173,6 +175,7 @@ def get_deleted_objects(deleted_objects, perms_needed, user, obj, opts, current_
                             (get_change_view_url(related.opts.app_label,
                                                  related.opts.object_name.lower(),
                                                  sub_obj._get_pk_val(),
+                                                 admin_site,
                                                  levels_to_root),
                             escape(sub_obj)))), []])
         # If there were related objects, and the user doesn't have
