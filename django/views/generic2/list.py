@@ -17,6 +17,8 @@ class ListView(GenericView):
             paginate_by = None,
             allow_empty = True,
             template_object_name = None,
+            queryset = None,
+            items = None,
         )
         super(ListView, self).__init__(**kwargs)
     

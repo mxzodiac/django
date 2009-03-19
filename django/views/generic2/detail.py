@@ -1,16 +1,24 @@
-class DetailView(object):
+from django.views.generic2 import GenericView
+
+class DetailView(GenericView):
     """
     Remember: caching on self is RIGHT OUT.
-    """
-    context_processors = None
-    mimetype = None
-    queryset = None
-    slug_field = None
-    template_loader = None
-    template_object_name = None
-    template_name = None
-    template_name_field = None
-    template_names = None
+    """    
+    def __init__(self, **kwargs):
+        self._load_config_values(kwargs, 
+            queryset = None,
+            slug_field = None
+            template_object_name = None
+            template_name_field = None
+        )
+        super(DetailView, self).__init__(**kwargs)
+    
+    def __call__(self, request, **kwargs):
+        template = self.load_template(request, None)
+        context = self.get_context(request, None)
+        mimetype = self.get_mimetype(request, None)
+        response = self.get_response(request, None, template, context, mimetype=mimetype)
+        return response
     
     def get_queryset(self, request):
         """
