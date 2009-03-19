@@ -4,6 +4,9 @@ class Author(models.Model):
    name = models.CharField(max_length=100)
    slug = models.SlugField()
 
+   class Meta:
+       ordering = ['name']
+
    def __unicode__(self):
        return self.name
 
@@ -12,6 +15,9 @@ class Book(models.Model):
    pages = models.IntegerField()
    authors = models.ManyToManyField(Author)
    pubdate = models.DateField()
+   
+   class Meta:
+       ordering = ['name']
    
    def __unicode__(self):
        return self.name
