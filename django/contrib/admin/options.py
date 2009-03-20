@@ -415,13 +415,22 @@ class ModelAdmin(BaseModelAdmin):
     action_checkbox.short_description = mark_safe('<input type="checkbox" id="action-toggle" />')
     action_checkbox.allow_tags = True
 
+
+    def get_actions(self):
+        actions = {}
+        for klass in self.__class__.mro():
+            for action in klass.actions:
+                func, name, description = self.get_action(action)
+                actions[name] = (func, name, description)
+        return actions
+
     def get_action_choices(self, default_choices=BLANK_CHOICE_DASH):
         choices = [] + default_choices
-        for action in getattr(self, 'actions', []):
-            func, name, description = self.get_action(action)
+        for func, name, description in self.get_action().itervalues():
             choice = (name, description % model_format_dict(self.opts))
             choices.append(choice)
         return choices
+    
 
     def get_action(self, action):
         if callable(action):
@@ -646,16 +655,12 @@ class ModelAdmin(BaseModelAdmin):
 
             if action_form.is_valid():
                 action = action_form.cleaned_data['action']
-                func, name, description, instance_action = self.get_action(action)
+                func, name, description = self.get_actions[action]
                 selected = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
                 results = queryset.filter(pk__in=selected)
                 response = None
                 if callable(func):
-                    if instance_action:
-                        for obj in results:
-                            getattr(obj, name)(request)
-                    else:
-                        response = func(request, results)
+                    response = func(request, results)
                 if isinstance(response, HttpResponse):
                     return response
                 else:
