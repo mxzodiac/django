@@ -44,6 +44,8 @@ class AdminSite(object):
         else:
             name += '_'
         self.name = name
+        
+        self.actions = []
     
     def register(self, model_or_iterable, admin_class=None, **options):
         """
@@ -81,6 +83,9 @@ class AdminSite(object):
                 options['__module__'] = __name__
                 admin_class = type("%sAdmin" % model.__name__, (admin_class,), options)
             
+            for action in self.actions:
+                admin_class.actions.append(action)
+            
             # Validate (which might be a no-op)
             validate(admin_class, model)
             
@@ -99,6 +104,13 @@ class AdminSite(object):
             if model not in self._registry:
                 raise NotRegistered('The model %s is not registered' % model.__name__)
             del self._registry[model]
+    
+    def add_action(self, action):
+        if not callable(action):
+            raise TypeError("You can only register callable actions through an admin site")
+        self.actions.append(action)
+        for klass in self._registery.itervalues():
+            klass.actions.append(action)
     
     def has_permission(self, request):
         """
