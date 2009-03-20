@@ -418,36 +418,22 @@ class ModelAdmin(BaseModelAdmin):
     def get_action_choices(self, default_choices=BLANK_CHOICE_DASH):
         choices = [] + default_choices
         for action in getattr(self, 'actions', []):
-            func, name, description, instance_action = self.get_action(action)
+            func, name, description = self.get_action(action)
             choice = (name, description % model_format_dict(self.opts))
             choices.append(choice)
         return choices
 
     def get_action(self, action):
-        is_instance_action = False
         if callable(action):
             func = action
             action = action.__name__
         elif hasattr(self, action):
             func = getattr(self, action)
-        elif hasattr(self.model, action):
-            func = getattr(self.model, action)
-            is_instance_action = True
-        else:
-            callable_actions = {}
-            for item in getattr(self, 'actions', []):
-                if callable(item):
-                    callable_actions[item.__name__] = item
-            if action in callable_actions:
-                return self.get_action(callable_actions[action])
-            raise AttributeError, \
-                "'%s' model or '%s' have no action '%s'" % \
-                    (self.opts.object_name, self.__class__.__name__, action)
         if hasattr(func, 'short_description'):
             description = func.short_description
         else:
             description = capfirst(action.replace('_', ' '))
-        return func, action, description, is_instance_action
+        return func, action, description
 
     def delete_selected(self, request, selected):
         """
