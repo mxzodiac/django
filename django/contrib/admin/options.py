@@ -416,7 +416,7 @@ class ModelAdmin(BaseModelAdmin):
     action_checkbox.allow_tags = True
 
 
-    def get_actions(self):
+    def get_actions(self, request=None):
         actions = {}
         for klass in self.__class__.mro():
             for action in getattr(klass, 'actions', []):
@@ -424,9 +424,9 @@ class ModelAdmin(BaseModelAdmin):
                 actions[name] = (func, name, description)
         return actions
 
-    def get_action_choices(self, default_choices=BLANK_CHOICE_DASH):
+    def get_action_choices(self, default_choices=BLANK_CHOICE_DASH, request=None):
         choices = [] + default_choices
-        for func, name, description in self.get_actions().itervalues():
+        for func, name, description in self.get_actions(request).itervalues():
             choice = (name, description % model_format_dict(self.opts))
             choices.append(choice)
         return choices
@@ -650,11 +650,11 @@ class ModelAdmin(BaseModelAdmin):
                 if key not in (helpers.ACTION_CHECKBOX_NAME, 'index'):
                     data[key] = request.POST.getlist(key)[action_index]
             action_form = self.action_form(data, auto_id=None)
-            action_form.fields['action'].choices = self.get_action_choices()
+            action_form.fields['action'].choices = self.get_action_choices(request)
 
             if action_form.is_valid():
                 action = action_form.cleaned_data['action']
-                func, name, description = self.get_actions()[action]
+                func, name, description = self.get_actions(request)[action]
                 selected = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
                 results = queryset.filter(pk__in=selected)
                 response = None
@@ -667,7 +667,7 @@ class ModelAdmin(BaseModelAdmin):
                     return HttpResponseRedirect(redirect_to)
         else:
             action_form = self.action_form(auto_id=None)
-            action_form.fields['action'].choices = self.get_action_choices()
+            action_form.fields['action'].choices = self.get_action_choices(request)
         return action_form
 
     def add_view(self, request, form_url='', extra_context=None):
