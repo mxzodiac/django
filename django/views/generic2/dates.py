@@ -204,7 +204,7 @@ class MonthView(DateView):
         Return (date_list, items, extra_context) for this request.
         """
         date_field = self.get_date_field(request)
-        date = _date_from_string('%Y'+self.get_month_format(request), year, month)
+        date = _date_from_string(year, '%Y', month, self.get_month_format(request))
         
         # Construct a date-range lookup.
         first_day, last_day = _month_bounds(date)        
@@ -327,16 +327,17 @@ class MonthView(DateView):
         """
         return self.month_format
 
-def _date_from_string(format, year, month, day=''):
+def _date_from_string(year, year_format, month, month_format, day='', day_format='', delim='__'):
     """
     Helper: get a datetime.date object given a format string and a year,
     month, and possibly day; raise a 404 for an invalid date.
     """
+    format = delim.join((year_format, month_format, day_format))
+    datestr = delim.join((year, month, day))
     try:
-        return datetime.date(*time.strptime(year+month+day, format)[:3])
+        return datetime.date(*time.strptime(datestr, format)[:3])
     except ValueError:
-        raise Http404("Invalid date string '%s' given format '%s'" \
-                      % (year+month+day, format))
+        raise Http404("Invalid date string '%s' given format '%s'" % (datestr, format))
                       
 def _month_bounds(date):
     """
