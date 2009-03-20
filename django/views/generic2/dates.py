@@ -66,7 +66,7 @@ class DateView(ListView):
         allow_empty = self.get_allow_empty(request)
 
         date_list = queryset.dates(date_field, date_type)[::-1]
-        if not date_list and not allow_empty:
+        if date_list is not None and not date_list and not allow_empty:
             raise Http404("No %s available" % queryset.model._meta.verbose_name_plural)
             
         return date_list
@@ -326,6 +326,38 @@ class MonthView(DateView):
         month from url variables.
         """
         return self.month_format
+
+class WeekView(DateView):
+    """
+    List of objects published in a given week.
+    """
+    
+    _template_name_suffix = 'archive_year'
+    
+    def __init__(self, **kwargs):
+        # Override the allow_empty default from ListView
+        allow_empty = kwargs.pop('allow_empty', getattr(self, 'allow_empty', False))
+        super(YearView, self).__init__(allow_empty=allow_empty, **kwargs)
+    
+    def get_dated_items(self, request, year, week):
+        """
+        Return (date_list, items, extra_context) for this request.
+        """
+        date_field = self.get_date_field(request)
+        date = _date_from_string(year, '%Y', '0', '%w', week, '%U')
+        
+        # Construct a date-range lookup.
+        first_day = date
+        last_day = date + datetime.timedelta(days=7)
+        lookup_kwargs = {
+            '%s__gte' % date_field: first_day,
+            '%s__lt' % date_field: last_day,
+        }
+
+        allow_future = self.get_allow_future(request)
+        qs = self.get_dated_queryset(request, allow_future=allow_future, **lookup_kwargs)
+        
+        return (None, qs, {'week': date})
 
 def _date_from_string(year, year_format, month, month_format, day='', day_format='', delim='__'):
     """
