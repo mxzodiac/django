@@ -419,18 +419,17 @@ class ModelAdmin(BaseModelAdmin):
     def get_actions(self):
         actions = {}
         for klass in self.__class__.mro():
-            for action in klass.actions:
+            for action in getattr(klass, 'actions', []):
                 func, name, description = self.get_action(action)
                 actions[name] = (func, name, description)
         return actions
 
     def get_action_choices(self, default_choices=BLANK_CHOICE_DASH):
         choices = [] + default_choices
-        for func, name, description in self.get_action().itervalues():
+        for func, name, description in self.get_actions().itervalues():
             choice = (name, description % model_format_dict(self.opts))
             choices.append(choice)
         return choices
-    
 
     def get_action(self, action):
         if callable(action):
@@ -655,7 +654,7 @@ class ModelAdmin(BaseModelAdmin):
 
             if action_form.is_valid():
                 action = action_form.cleaned_data['action']
-                func, name, description = self.get_actions[action]
+                func, name, description = self.get_actions()[action]
                 selected = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
                 results = queryset.filter(pk__in=selected)
                 response = None

@@ -12,7 +12,7 @@ from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
 from django.utils.html import escape
 
 # local test models
-from models import Article, CustomArticle, Section, ModelWithStringPrimaryKey, Person, Persona, FooAccount, BarAccount, Subscriber, DirectSubscriber, ExternalSubscriber
+from models import Article, CustomArticle, Section, ModelWithStringPrimaryKey, Person, Persona, FooAccount, BarAccount, Subscriber, ExternalSubscriber
 
 try:
     set
@@ -917,19 +917,6 @@ class AdminActionsTest(TestCase):
         self.assertContains(confirmation, "Are you sure you want to delete the selected subscriber objects")
         response = self.client.post('/test_admin/admin/admin_views/subscriber/', delete_confirmation_data)
         self.failUnlessEqual(Subscriber.objects.count(), 0)
-
-    def test_custom_model_instance_action(self):
-        "Tests a custom action defined in a model method"
-        action_data = {
-            ACTION_CHECKBOX_NAME: [1],
-            'action' : 'direct_mail',
-            'index': 0,
-            'paid': 1,
-        }
-        response = self.client.post('/test_admin/admin/admin_views/directsubscriber/', action_data)
-        self.assertEquals(len(mail.outbox), 1)
-        self.assertEquals(mail.outbox[0].subject, 'Greetings from a model action')
-        self.assertEquals(mail.outbox[0].to, [u'john@example.org'])
 
     def test_custom_function_mail_action(self):
         "Tests a custom action defined in a function"

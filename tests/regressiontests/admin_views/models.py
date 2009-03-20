@@ -218,20 +218,6 @@ class SubscriberAdmin(admin.ModelAdmin):
             ['to@example.com']
         ).send()
 
-class DirectSubscriber(Subscriber):
-    paid = models.BooleanField(default=False)
-
-    def direct_mail(self, request):
-        EmailMessage(
-            'Greetings from a model action',
-            'This is the test email from a model action',
-            'from@example.com',
-            [self.email]
-        ).send()
-
-class DirectSubscriberAdmin(admin.ModelAdmin):
-    actions = ['direct_mail']
-
 class ExternalSubscriber(Subscriber):
     pass
 
@@ -259,7 +245,6 @@ admin.site.register(Thing, ThingAdmin)
 admin.site.register(Person, PersonAdmin)
 admin.site.register(Persona, PersonaAdmin)
 admin.site.register(Subscriber, SubscriberAdmin)
-admin.site.register(DirectSubscriber, DirectSubscriberAdmin)
 admin.site.register(ExternalSubscriber, ExternalSubscriberAdmin)
 
 # We intentionally register Promo and ChapterXtra1 but not Chapter nor ChapterXtra2.

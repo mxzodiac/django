@@ -8,11 +8,6 @@
         <field type="CharField" name="name">Max Mustermann</field>
         <field type="CharField" name="email">max@example.org</field>
     </object>
-    <object pk="1" model="admin_views.directsubscriber">
-        <field type="CharField" name="name">John Doe</field>
-        <field type="CharField" name="email">john@example.org</field>
-        <field type="BooleanField" name="paid">True</field>
-    </object>
     <object pk="1" model="admin_views.externalsubscriber">
         <field type="CharField" name="name">John Doe</field>
         <field type="CharField" name="email">john@example.org</field>
