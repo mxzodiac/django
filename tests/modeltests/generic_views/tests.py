@@ -82,4 +82,30 @@ class ListViewTests(TestCase):
         Author.objects.all().delete()
         for i in range(n):
             Author.objects.create(name='Author %02i' % i, slug='a%s' % i)
+
+class DetailViewTests(TestCase):
+    fixtures = ['generic-views-test-data.json']
+    urls = 'modeltests.generic_views.urls'
+    
+    def test_simple_object(self):
+        res = self.client.get('/detail/obj/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.context['object'], {'foo': 'bar'})
+        self.assertTemplateUsed(res, 'generic_views/detail.html')
         
+    def test_detail_by_pk(self):
+        res = self.client.get('/detail/author/1/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.context['object'], Author.objects.get(pk=1))
+        self.assertEqual(res.context['author'], Author.objects.get(pk=1))
+        self.assertTemplateUsed(res, 'generic_views/author_detail.html')
+        
+    def test_detail_by_slug(self):
+        res = self.client.get('/detail/author/byslug/scott-rosenberg/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.context['object'], Author.objects.get(slug='scott-rosenberg'))
+        self.assertEqual(res.context['author'], Author.objects.get(slug='scott-rosenberg'))
+        self.assertTemplateUsed(res, 'generic_views/author_detail.html')
+        
+    def test_invalid_url(self):
+        self.assertRaises(AttributeError, self.client.get, '/detail/author/invalid/')

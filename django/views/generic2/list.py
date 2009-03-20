@@ -11,7 +11,6 @@ class ListView(GenericView):
     queryset will be handled correctly.
     """
     
-    
     def __init__(self, **kwargs):
         self._load_config_values(kwargs, 
             paginate_by = None,
@@ -49,17 +48,14 @@ class ListView(GenericView):
         """
         Get the number of items to paginate by, or ``None`` for no pagination.
         """
-        return self.paginate_by or None
+        return self.paginate_by
         
     def get_allow_empty(self, request, items):
         """
         Returns ``True`` if the view should display empty lists, and ``False``
         if a 404 should be raised instead.
         """
-        if self.allow_empty is None:
-            return True
-        else:
-            return self.allow_empty
+        return self.allow_empty
         
     def paginate_items(self, request, items, page):
         """

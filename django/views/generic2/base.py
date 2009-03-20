@@ -18,27 +18,13 @@ class GenericView(object):
             badkey = kwargs.iterkeys().next()
             raise TypeError("__init__() got an unexpected keyword argument '%s'" % badkey)
     
-    def __call__(self, request, **kwargs):
-        template = self.load_template(request, None)
-        context = self.get_context(request, None)
-        mimetype = self.get_mimetype(request, None)
-        response = self.get_response(request, None, template, context, mimetype=mimetype)
+    def __call__(self, request, object=None):
+        template = self.get_template(request, object)
+        context = self.get_context(request, object)
+        mimetype = self.get_mimetype(request, object)
+        response = self.get_response(request, object, template, context, mimetype=mimetype)
         return response
     
-    def load_template(self, request, obj, names=[]):
-        """
-        Load a template, using self.template_loader or the default.
-        """
-        return self.get_template_loader(request, obj).select_template(names)
-    
-    def get_template_loader(self, request, obj):
-        """
-        Get the template loader to be used for this request. Defaults to 
-        ``django.template.loader``.
-        """
-        import django.template.loader
-        return self.template_loader or django.template.loader
-
     def get_template(self, request, obj):
         """
         Get a ``Template`` object for the given request.
@@ -59,6 +45,20 @@ class GenericView(object):
             return [self.template_name]
         else:
             return self.template_name
+    
+    def load_template(self, request, obj, names=[]):
+        """
+        Load a template, using self.template_loader or the default.
+        """
+        return self.get_template_loader(request, obj).select_template(names)
+    
+    def get_template_loader(self, request, obj):
+        """
+        Get the template loader to be used for this request. Defaults to 
+        ``django.template.loader``.
+        """
+        import django.template.loader
+        return self.template_loader or django.template.loader
             
     def get_context(self, request, obj):
         """
@@ -71,13 +71,13 @@ class GenericView(object):
         """
         Get the context processors to be used for the given request.
         """
-        return self.context_processors or None
+        return self.context_processors
 
     def get_mimetype(self, request, obj):
         """
         Get the mimetype to be used for the given request.
         """
-        return self.mimetype or "text/html"
+        return self.mimetype
         
     def get_response(self, request, obj, template, context, **httpresponse_kwargs):
         """

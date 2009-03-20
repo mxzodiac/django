@@ -1,64 +1,94 @@
+import re
+from django import template
+from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
+from django.http import Http404
 from django.views.generic2 import GenericView
 
 class DetailView(GenericView):
     """
-    Remember: caching on self is RIGHT OUT.
-    """    
+    Render a "detail" view of an object. 
+    
+    By default this is a model instance lookedup from `self.queryset`, but the
+    view will support display of *any* object by overriding `get_object()`.
+    """
+
     def __init__(self, **kwargs):
         self._load_config_values(kwargs, 
             queryset = None,
-            slug_field = None
-            template_object_name = None
-            template_name_field = None
+            slug_field = 'slug',
+            template_object_name = None,
+            template_name_field = None,
         )
         super(DetailView, self).__init__(**kwargs)
     
     def __call__(self, request, **kwargs):
-        template = self.load_template(request, None)
-        context = self.get_context(request, None)
-        mimetype = self.get_mimetype(request, None)
-        response = self.get_response(request, None, template, context, mimetype=mimetype)
-        return response
-    
-    def get_queryset(self, request):
-        """
-        Get the queryset for the request.
-        """
-        if self.queryset is None:
-            raise ImproperlyConfigured("ListDetailView must be given a queryset. "\
-                                       "Define self.queryset, or self.get_queryset().")
-        return self.queryset
+        obj = self.get_object(request, **kwargs)
+        return super(DetailView, self).__call__(request, object=obj)
         
-    def get_object(self, request, pk, slug):
+    def get_object(self, request, **kwargs):
+        """
+        Get the object this request wraps. By default this requires
+        `self.queryset` and a `pk` or `slug` argument in the URLconf, but
+        subclasses can override this to return any object.
+        """
         qs = self.get_queryset(request)
-        if pk:
-            qs = qs.filter(pk=pk)
-        elif slug:
-            slug_field = self.slug_field or 'slug'
-            qs = qs.filter(**{slug_field: slug})
+        
+        # Look up an object from the provided queryset.
+        
+        # First, try looking up by primary key.
+        if 'pk' in kwargs:
+            qs = qs.filter(pk=kwargs.pop('pk'))
+
+        # Next, try looking up by slug.
+        elif 'slug' in kwargs:
+            slug_field = self.get_slug_field(request)
+            qs = qs.filter(**{slug_field: kwargs.pop('slug')})
+        
+        # Finally, look for the (deprecated) object_id argument.
+        elif 'object_id' in kwargs:
+            import warnings
+            warnings.warn(
+                "The 'object_id' parameter to generic views is deprecated. "\
+                "Use 'pk' instead.",
+                PendingDeprecationWarning
+            )
+            qs = qs.filter(pk=kwargs.pop('object_id'))
+        
+        # If none of those are defined, it's an error.
         else:
-            raise AttributeError("Generic detail view must be called with "\
-                                 "either an object id or a slug.")
-    
+            raise AttributeError("Generic detail view %s must be called with "\
+                                 "either an object id or a slug." \
+                                 % self.__class__.__name__)
+            
         try:
             return qs.get()
         except ObjectDoesNotExist:
             raise Http404("No %s found matching the query" % \
                           (qs.model._meta.verbose_name))
+
+    def get_queryset(self, request):
+        """
+        Get the queryset to look an object up against. May not be called if
+        `get_object` is overridden.
+        """
+        if self.queryset is None:
+            raise ImproperlyConfigured("%(cls)s is missing a queryset. Define "\
+                                       "%(cls)s.queryset, or override "\
+                                       "%(cls)s.get_object()." % {'cls': self.__class__.__name__})
+        return self.queryset._clone()
     
-    def get_template(self, request, obj):
+    def get_slug_field(self, request):
         """
-        Get a Template object for the given request.
+        Get the name of a slug field to be used to look up by slug.
         """
-        names = self.get_template_names(request, obj)
-        return self.load_template(request, obj, names)
-        
+        return self.slug_field
+                
     def get_template_names(self, request, obj):
         """
         Return a list of template names to be used for the request. Must return
         a list. May not be called if get_template is overridden.
         """
-        names = []
+        names = super(DetailView, self).get_template_names(request, obj)
         
         # If self.template_name_field is set, grab the value of the field
         # of that name from the object; this is the most specific template
@@ -66,38 +96,26 @@ class DetailView(GenericView):
         if self.template_name_field:
             name = getattr(obj, self.template_name_field, None)
             if name:
-                names.append(name)
-                
-        # Next, try self.template_names
-        names.extend(self.template_names or [])
-                
-        # Now fall down to self.template_name.
-        if self.template_name:
-            names.append(self.template_name)
-            
-        # Finally, the least-specific option is the default 
-        # <app>/<model>_detail.html.
-        names.append("%s/%s_detail.html" % (obj._meta.app_label, 
-                                            obj._meta.object_name.lower()))
+                names.insert(0, name)
+                                            
+        # The least-specific option is the default <app>/<model>_detail.html;
+        # only use this if the object in question is a model.
+        if hasattr(obj, '_meta'):
+            names.append("%s/%s_detail.html" % (obj._meta.app_label, 
+                                                obj._meta.object_name.lower()))
             
         return names
-        
-    def load_template(self, request, obj, names):
-        """
-        Load a template, using self.template_loader or the default.
-        """
-        loader = self.template_loader or django.template.loader
-        return loader.select_template(names)
-        
+                
     def get_context(self, request, obj):
         """
         Get the context. Must return a Context (or subclass) instance.
         """
-        nicename = self.get_template_object_name(request, obj)
         context = template.RequestContext(request, {
             "object": obj,
-            nicename: obj,
         }, self.get_context_processors(request, obj))
+        nicename = self.get_template_object_name(request, obj)
+        if nicename:
+            context[nicename] = obj
         
         return context
 
@@ -105,35 +123,10 @@ class DetailView(GenericView):
         """
         Get the name of the object to use in the context.
         """
-        return self.template_object_name or \
-               re.sub('[^a-zA-Z0-9]+', '_', obj._meta.verbose_name.lower())
-                   
-    def get_context_processors(self, request, obj):
-        """
-        Get the context processors.
-        """
-        return self.context_processors
+        if self.template_object_name:
+            return self.template_object_name
+        elif hasattr(obj, '_meta'):
+            return re.sub('[^a-zA-Z0-9]+', '_', obj._meta.verbose_name.lower())
+        else:
+            return None
         
-    def get_mimetype(self, request, obj):
-        """
-        Get the mimetype for the response.
-        """
-        return self.mimetype or 'text/html'
-    
-    def get_response(self, request, obj):
-        """
-        Get the response for an object; must return an HttpResponse.
-        """
-        template = self.get_template(request, obj)
-        context = self.get_context(request, obj)
-        mimetype = self.get_mimetype(request, obj)
-        response = HttpResponse(template.render(context), mimetype=mimetype)
-        return response
-
-    def __call__(self, request, pk=None, slug=None, object_id=None):
-        """
-        The view.
-        """
-        pk = pk or object_id
-        obj = self.get_object(request, pk, slug)
-        return self.get_response(request, obj)

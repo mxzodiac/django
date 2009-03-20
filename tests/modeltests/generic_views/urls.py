@@ -20,4 +20,17 @@ urlpatterns = patterns('',
     
     (r'^list/authors/template_object_name/$',
         views.AuthorList(template_object_name='author')),
+        
+    (r'^detail/obj/$',
+        views.ObjectDetail()),
+        
+    (r'^detail/author/(?P<pk>\d+)/$',
+        views.AuthorDetail()),
+        
+    (r'^detail/author/byslug/(?P<slug>[\w-]+)/$',
+        views.AuthorDetail()),
+        
+    (r'^detail/author/invalid/$',
+        views.AuthorDetail()),
+    
 )
