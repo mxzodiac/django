@@ -1,4 +1,6 @@
+import datetime
 from models import Author, Book
+from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
 
 class ListViewTests(TestCase):
@@ -63,6 +65,16 @@ class ListViewTests(TestCase):
         self.assertEqual(len(res.context['authors']), 30)
         self.assertEqual(res.context['authors'][0].name, 'Author 60')
         self.assertEqual(res.context['page_obj'].number, 3)
+        
+    def test_paginated_page_out_of_range(self):
+        self._make_authors(100)
+        res = self.client.get('/list/authors/paginated/42/')
+        self.assertEqual(res.status_code, 404)
+
+    def test_paginated_invalid_page(self):
+        self._make_authors(100)
+        res = self.client.get('/list/authors/paginated/?page=frog')
+        self.assertEqual(res.status_code, 404)
 
     def test_allow_empty_false(self):
         res = self.client.get('/list/authors/notempty/')
@@ -77,6 +89,9 @@ class ListViewTests(TestCase):
         self.assertEqual(list(res.context['object_list']), list(Author.objects.all()))
         self.assertEqual(list(res.context['author_list']), list(Author.objects.all()))
         self.assert_('authors' not in res.context)
+
+    def test_missing_items(self):
+        self.assertRaises(ImproperlyConfigured, self.client.get, '/list/authors/invalid/')
 
     def _make_authors(self, n):
         Author.objects.all().delete()
@@ -108,4 +123,138 @@ class DetailViewTests(TestCase):
         self.assertTemplateUsed(res, 'generic_views/author_detail.html')
         
     def test_invalid_url(self):
-        self.assertRaises(AttributeError, self.client.get, '/detail/author/invalid/')
+        self.assertRaises(AttributeError, self.client.get, '/detail/author/invalid/url/')
+        
+    def test_invalid_queryset(self):
+        self.assertRaises(ImproperlyConfigured, self.client.get, '/detail/author/invalid/qs/')
+        
+class ArchiveViewTests(TestCase):
+    fixtures = ['generic-views-test-data.json']
+    urls = 'modeltests.generic_views.urls'
+    
+    def test_archive_view(self):
+        res = self.client.get('/dates/books/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.context['date_list'], Book.objects.dates('pubdate', 'year')[::-1])
+        self.assertEqual(list(res.context['latest']), list(Book.objects.all()))
+        self.assertTemplateUsed(res, 'generic_views/book_archive.html')
+        
+    def test_archive_view_invalid(self):
+        self.assertRaises(ImproperlyConfigured, self.client.get, '/dates/books/invalid/')
+
+class YearViewTests(TestCase):
+    fixtures = ['generic-views-test-data.json']
+    urls = 'modeltests.generic_views.urls'
+
+    def test_year_view(self):
+        res = self.client.get('/dates/books/2008/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(list(res.context['date_list']), [datetime.datetime(2008, 10, 1)])
+        self.assertEqual(res.context['year'], 2008)
+        self.assertTemplateUsed(res, 'generic_views/book_archive_year.html')
+    
+    def test_year_view_make_object_list(self):
+        res = self.client.get('/dates/books/2006/make_object_list/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(list(res.context['date_list']), [datetime.datetime(2006, 5, 1)])
+        self.assertEqual(list(res.context['books']), list(Book.objects.filter(pubdate__year=2006)))
+        self.assertEqual(list(res.context['object_list']), list(Book.objects.filter(pubdate__year=2006)))
+        self.assertTemplateUsed(res, 'generic_views/book_archive_year.html')
+        
+    def test_year_view_empty(self):
+        res = self.client.get('/dates/books/1999/')
+        self.assertEqual(res.status_code, 404)
+        res = self.client.get('/dates/books/1999/allow_empty/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(list(res.context['date_list']), [])
+        self.assertEqual(list(res.context['books']), [])
+        
+    def test_year_view_allow_future(self):
+        # Create a new book in the future
+        year = datetime.date.today().year + 1
+        b = Book.objects.create(name="The New New Testement", pages=600, pubdate=datetime.date(year, 1, 1))
+        res = self.client.get('/dates/books/%s/' % year)
+        self.assertEqual(res.status_code, 404)
+        
+        res = self.client.get('/dates/books/%s/allow_empty/' % year)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(list(res.context['books']), [])
+        
+        res = self.client.get('/dates/books/%s/allow_future/' % year)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(list(res.context['date_list']), [datetime.datetime(year, 1, 1)])
+        
+    def test_year_view_invalid_pattern(self):
+        self.assertRaises(TypeError, self.client.get, '/dates/books/no_year/')
+        
+class MonthViewTests(TestCase):
+    fixtures = ['generic-views-test-data.json']
+    urls = 'modeltests.generic_views.urls'
+
+    def test_month_view(self):
+        res = self.client.get('/dates/books/2008/oct/')
+        self.assertEqual(res.status_code, 200)
+        self.assertTemplateUsed(res, 'generic_views/book_archive_month.html')
+        self.assertEqual(list(res.context['date_list']), [datetime.datetime(2008, 10, 1)])
+        self.assertEqual(list(res.context['books']), 
+                         list(Book.objects.filter(pubdate=datetime.date(2008, 10, 1))))
+        self.assertEqual(res.context['month'], datetime.date(2008, 10, 1))
+        
+        # Since allow_empty=False, next/prev months must be valid (#7164)
+        self.assertEqual(res.context['next_month'](), None)
+        self.assertEqual(res.context['previous_month'](), datetime.date(2006, 5, 1))
+        
+    def test_month_view_allow_empty(self):
+        # allow_empty = False, empty month
+        res = self.client.get('/dates/books/2000/jan/')
+        self.assertEqual(res.status_code, 404)
+        
+        # allow_empty = True, empty month
+        res = self.client.get('/dates/books/2000/jan/allow_empty/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(list(res.context['date_list']), [])
+        self.assertEqual(list(res.context['books']), [])
+        self.assertEqual(res.context['month'], datetime.date(2000, 1, 1))
+        
+        # Since it's allow empty, next/prev are allowed to be empty months (#7164)
+        self.assertEqual(res.context['next_month'](), datetime.date(2000, 2, 1))
+        self.assertEqual(res.context['previous_month'](), datetime.date(1999, 12, 1))
+        
+        # allow_empty but not allow_future: next_month should be empty (#7164)
+        url = datetime.date.today().strftime('/dates/books/%Y/%b/allow_empty/').lower()
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.context['next_month'](), None)
+
+    def test_month_view_allow_future(self):
+        future = (datetime.date.today() + datetime.timedelta(days=60)).replace(day=1)
+        urlbit = future.strftime('%Y/%b').lower()
+        b = Book.objects.create(name="The New New Testement", pages=600, pubdate=future)
+        
+        # allow_future = False, future month
+        res = self.client.get('/dates/books/%s/' % urlbit)
+        self.assertEqual(res.status_code, 404)
+        
+        # allow_future = True, valid future month
+        res = self.client.get('/dates/books/%s/allow_future/' % urlbit)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.context['date_list'][0].date(), b.pubdate)
+        self.assertEqual(list(res.context['books']), [b])
+        self.assertEqual(res.context['month'], future)
+        
+        # Since it's allow_future but not allow_empty, next/prev are not
+        # allowed to be empty months (#7164)
+        self.assertEqual(res.context['next_month'](), None)
+        self.assertEqual(res.context['previous_month'](), datetime.date(2008, 10, 1))
+        
+        # allow_future, but not allow_empty, with a current month. So next
+        # should be in the future (yup, #7164, again)
+        res = self.client.get('/dates/books/2008/oct/allow_future/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.context['next_month'](), future)
+        self.assertEqual(res.context['previous_month'](), datetime.date(2006, 5, 1))
+        
+    def test_month_view_invalid_pattern(self):
+        self.assertRaises(TypeError, self.client.get, '/dates/books/2007/no_month/')
+        
+    

@@ -60,12 +60,14 @@ class GenericView(object):
         import django.template.loader
         return self.template_loader or django.template.loader
             
-    def get_context(self, request, obj):
+    def get_context(self, request, obj, context=None):
         """
         Get the context. Must return a Context (or subclass) instance.
         """
         processors = self.get_context_processors(request, obj)
-        return RequestContext(request, {}, processors)
+        if context is None:
+            context = {}
+        return RequestContext(request, context, processors)
 
     def get_context_processors(self, request, obj):
         """

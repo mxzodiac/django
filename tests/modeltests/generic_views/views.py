@@ -1,7 +1,7 @@
 from models import Author, Book
-from django.views.generic2 import ListView, DetailView
+from django.views import generic2 as generic
 
-class DictList(ListView):
+class DictList(generic.ListView):
     """A ListView that doesn't use a model."""
     items = [
         {'first': 'John', 'last': 'Lennon'},
@@ -9,15 +9,26 @@ class DictList(ListView):
     ]
     template_name = 'generic_views/list.html'
 
-class AuthorList(ListView):
+class AuthorList(generic.ListView):
     queryset = Author.objects.all()
     template_name = 'generic_views/list.html'
     
-class AuthorDetail(DetailView):
+class AuthorDetail(generic.DetailView):
     queryset = Author.objects.all()
     
-class ObjectDetail(DetailView):
+class ObjectDetail(generic.DetailView):
     template_name = 'generic_views/detail.html'
     def get_object(self, request, **kwargs):
         return {'foo': 'bar'}
-        
+
+class BookArchive(generic.ArchiveView):
+    queryset = Book.objects.all()
+    date_field = 'pubdate'
+
+class BookYearArchive(generic.YearView):
+    queryset = Book.objects.all()
+    date_field = 'pubdate'
+    
+class BookMonthArchive(generic.MonthView):
+    queryset = Book.objects.all()
+    date_field = 'pubdate'

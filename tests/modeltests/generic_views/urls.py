@@ -1,36 +1,40 @@
 import views
-from django.views.generic2 import GenericView
 from django.conf.urls.defaults import *
 
 urlpatterns = patterns('',
-    (r'^list/dict/$',
-        views.DictList()),
+    # ListView
+    (r'^list/dict/$',                            views.DictList()),
+    (r'^list/authors/$',                         views.AuthorList()),    
+    (r'^list/authors/paginated/$',               views.AuthorList(paginate_by=30)),
+    (r'^list/authors/paginated/(?P<page>\d+)/$', views.AuthorList(paginate_by=30)),
+    (r'^list/authors/notempty/$',                views.AuthorList(allow_empty=False)),
+    (r'^list/authors/template_object_name/$',    views.AuthorList(template_object_name='author')),
+    (r'^list/authors/invalid/$',                 views.AuthorList(queryset=None)),
     
-    (r'^list/authors/$',
-        views.AuthorList()),
+    # DetailView
+    (r'^detail/obj/$',                            views.ObjectDetail()),
+    (r'^detail/author/(?P<pk>\d+)/$',             views.AuthorDetail()),
+    (r'^detail/author/byslug/(?P<slug>[\w-]+)/$', views.AuthorDetail()),
+    (r'^detail/author/invalid/url/$',             views.AuthorDetail()),
+    (r'^detail/author/invalid/qs/$',              views.AuthorDetail(queryset=None)),
     
-    (r'^list/authors/paginated/$',
-        views.AuthorList(paginate_by=30)),
+    # ArchiveView
+    (r'^dates/books/$',         views.BookArchive()),
+    (r'^dates/books/invalid/$', views.BookArchive(queryset=None)),
     
-    (r'^list/authors/paginated/(?P<page>\d+)/$',
-        views.AuthorList(paginate_by=30)),
-    
-    (r'^list/authors/notempty/$',
-        views.AuthorList(allow_empty=False)),
-    
-    (r'^list/authors/template_object_name/$',
-        views.AuthorList(template_object_name='author')),
-        
-    (r'^detail/obj/$',
-        views.ObjectDetail()),
-        
-    (r'^detail/author/(?P<pk>\d+)/$',
-        views.AuthorDetail()),
-        
-    (r'^detail/author/byslug/(?P<slug>[\w-]+)/$',
-        views.AuthorDetail()),
-        
-    (r'^detail/author/invalid/$',
-        views.AuthorDetail()),
+    # YearView
+    # Mixing keyword and possitional captures below is intentional; the views
+    # ought to be able to accept either.
+    (r'^dates/books/(?P<year>\d{4})/$',          views.BookYearArchive()),
+    (r'^dates/books/(\d{4})/make_object_list/$', views.BookYearArchive(make_object_list=True)),
+    (r'^dates/books/(\d{4})/allow_empty/$',      views.BookYearArchive(allow_empty=True)),
+    (r'^dates/books/(\d{4})/allow_future/$',     views.BookYearArchive(allow_future=True)),
+    (r'^dates/books/no_year/$',                  views.BookYearArchive()),
+
+    # MonthView
+    (r'^dates/books/(\d{4})/([a-z]{3})/$',              views.BookMonthArchive()),
+    (r'^dates/books/(\d{4})/([a-z]{3})/allow_empty/$',  views.BookMonthArchive(allow_empty=True)),
+    (r'^dates/books/(\d{4})/([a-z]{3})/allow_future/$', views.BookMonthArchive(allow_future=True)),
+    (r'^dates/books/(\d{4})/no_month/$',                views.BookMonthArchive()),
     
 )

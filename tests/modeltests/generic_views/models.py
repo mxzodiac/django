@@ -17,7 +17,7 @@ class Book(models.Model):
    pubdate = models.DateField()
    
    class Meta:
-       ordering = ['name']
+       ordering = ['-pubdate']
    
    def __unicode__(self):
        return self.name

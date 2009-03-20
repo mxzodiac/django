@@ -50,7 +50,7 @@ class ListView(GenericView):
         """
         return self.paginate_by
         
-    def get_allow_empty(self, request, items):
+    def get_allow_empty(self, request):
         """
         Returns ``True`` if the view should display empty lists, and ``False``
         if a 404 should be raised instead.
@@ -62,7 +62,7 @@ class ListView(GenericView):
         Paginate the list of items, if needed.
         """
         paginate_by = self.get_paginate_by(request, items)
-        allow_empty = self.get_allow_empty(request, items)
+        allow_empty = self.get_allow_empty(request)
         if not paginate_by:
             if not allow_empty and len(items) == 0:
                 raise Http404("Empty list and '%s.allow_empty' is False." % self.__class__.__name__)
@@ -83,7 +83,7 @@ class ListView(GenericView):
         except InvalidPage:
             raise Http404('Invalid page (%s)' % page_number)
             
-    def get_template_names(self, request, items):
+    def get_template_names(self, request, items, suffix='list'):
         """
         Return a list of template names to be used for the request. Must return
         a list. May not be called if get_template is overridden.
@@ -96,21 +96,24 @@ class ListView(GenericView):
         # generated ones.
         if hasattr(items, 'model'):
             opts = items.model._meta
-            names.append("%s/%s_list.html" % (opts.app_label, opts.object_name.lower()))
-
+            names.append("%s/%s_%s.html" % (opts.app_label, opts.object_name.lower(), suffix))
+        
         return names
 
-    def get_context(self, request, items, paginator, page):
+    def get_context(self, request, items, paginator, page, context=None):
         """
         Get the context for this view.
         """
-        context = super(ListView, self).get_context(request, items)
+        if not context:
+            context = {}
         context.update({
             'paginator': paginator,
             'object_list': items,
             'page_obj': page,
             'is_paginated':  paginator is not None
         })
+        context = super(ListView, self).get_context(request, items, context)
+        
         template_obj_name = self.get_template_object_name(request, items)
         if template_obj_name:
             context[template_obj_name] = items

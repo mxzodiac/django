@@ -110,13 +110,10 @@ class DetailView(GenericView):
         """
         Get the context. Must return a Context (or subclass) instance.
         """
-        context = template.RequestContext(request, {
-            "object": obj,
-        }, self.get_context_processors(request, obj))
+        context = super(DetailView, self).get_context(request, obj, {'object': obj})
         nicename = self.get_template_object_name(request, obj)
         if nicename:
             context[nicename] = obj
-        
         return context
 
     def get_template_object_name(self, request, obj):
