@@ -862,7 +862,7 @@ class ModelAdmin(BaseModelAdmin):
                 return render_to_response('admin/invalid_setup.html', {'title': _('Database error')})
             return HttpResponseRedirect(request.path + '?' + ERROR_FLAG + '=1')
 
-        action_form_or_response = self.response_action(request, queryset=cl.result_list)
+        action_form_or_response = self.response_action(request, queryset=cl.get_query_set())
         if isinstance(action_form_or_response, HttpResponse):
             return action_form_or_response
 
