@@ -1,5 +1,6 @@
 import time
 import datetime
+from django.db import models
 from django.core.exceptions import ImproperlyConfigured
 from django.http import Http404
 from django.views.generic2 import ListView
@@ -358,7 +359,88 @@ class WeekView(DateView):
         qs = self.get_dated_queryset(request, allow_future=allow_future, **lookup_kwargs)
         
         return (None, qs, {'week': date})
+
+class DayView(DateView):
+    
+    _template_name_suffix = "archive_day"
+    
+    def __init__(self, **kwargs):
+        # Override the allow_empty default from ListView
+        allow_empty = kwargs.pop('allow_empty', getattr(self, 'allow_empty', False))
+        self._load_config_values(kwargs, month_format='%b', day_format='%d')
+        super(DayView, self).__init__(allow_empty=allow_empty, **kwargs)
+
+    def get_dated_items(self, request, year, month, day):
+        """
+        Return (date_list, items, extra_context) for this request.
+        """
+        date_field = self.get_date_field(request)
+        date = _date_from_string(year, '%Y', 
+                                 month, self.get_month_format(), 
+                                 day, self.get_day_format())
+
+        # If the date field is a DateTimeField, we can't just do
+        # filter(df=date) because that doesn't take the time into account. 
+        # So we need to make a range for the lookup.
+        model = self.get_queryset(request).model
+        if isinstance(model._meta.get_field(date_field), models.DateTimeField):
+            date_range = (
+                datetime.datetime.combine(date, datetime.time.min), 
+                datetime.datetime.combine(date, datetime.time.max)
+            )
+            lookup_kwargs = {'%s__range' % date_field: date_range}
+        else:
+            lookup_kwargs = {date_field: date}
         
+        allow_future = self.get_allow_future(request)
+        qs = self.get_dated_queryset(request, allow_future=allow_future, **lookup_kwargs)
+
+        # Construct a set of callbacks for getting the next and previous 
+        # days. This isn't as expensive as getting the next and previous months,
+        # but only just, so again we'll memoize 'em as we do above for
+        # MonthView.
+        memo = {}
+        def get_next_day():
+            if 'next' not in memo:
+                memo['next'] = self.get_next_day(request, date)
+            return memo['next']
+            
+        def get_previous_day():
+            if 'prev' not in memo:
+                memo['prev'] = self.get_previous_day(request, date)
+            return memo['prev']
+        
+        return (None, qs, {
+            'day': date, 
+            'previous_day': get_previous_day, 
+            'next_day': get_next_day
+        })
+
+    def get_next_day(self, request, date):
+        """
+        Get the next valid day.
+        
+        This is complex in much the same way that MonthView.get_next_day is;
+        see the docstring there for details.
+        """
+        
+        
+
+    def get_month_format(self, request):
+        """
+        Get a month format string in strptime syntax to be used to parse the
+        month from url variables.
+        """
+        return self.month_format
+    
+    def get_day_format(self, request):
+        """
+        Get a month format string in strptime syntax to be used to parse the
+        month from url variables.
+        """
+        return self.day_format
+    
+
 def _date_from_string(year, year_format, month, month_format, day='', day_format='', delim='__'):
     """
     Helper: get a datetime.date object given a format string and a year,
