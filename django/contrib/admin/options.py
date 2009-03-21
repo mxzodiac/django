@@ -173,7 +173,7 @@ class BaseModelAdmin(object):
 class ModelAdmin(BaseModelAdmin):
     "Encapsulates all admin options and functionality for a given model."
     __metaclass__ = forms.MediaDefiningClass
-    
+
     list_display = ('action_checkbox', '__str__',)
     list_display_links = ()
     list_filter = ()
@@ -424,7 +424,7 @@ class ModelAdmin(BaseModelAdmin):
                 actions[name] = (func, name, description)
         return actions
 
-    def get_action_choices(self, default_choices=BLANK_CHOICE_DASH, request=None):
+    def get_action_choices(self, request=None, default_choices=BLANK_CHOICE_DASH):
         choices = [] + default_choices
         for func, name, description in self.get_actions(request).itervalues():
             choice = (name, description % model_format_dict(self.opts))
@@ -910,7 +910,7 @@ class ModelAdmin(BaseModelAdmin):
             media = self.media + formset.media
         else:
             media = self.media
-        
+
         context = {
             'title': cl.title,
             'is_popup': cl.is_popup,
