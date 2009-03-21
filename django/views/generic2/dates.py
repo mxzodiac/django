@@ -337,7 +337,7 @@ class WeekView(DateView):
     def __init__(self, **kwargs):
         # Override the allow_empty default from ListView
         allow_empty = kwargs.pop('allow_empty', getattr(self, 'allow_empty', False))
-        super(YearView, self).__init__(allow_empty=allow_empty, **kwargs)
+        super(WeekView, self).__init__(allow_empty=allow_empty, **kwargs)
     
     def get_dated_items(self, request, year, week):
         """
@@ -353,7 +353,7 @@ class WeekView(DateView):
             '%s__gte' % date_field: first_day,
             '%s__lt' % date_field: last_day,
         }
-
+        
         allow_future = self.get_allow_future(request)
         qs = self.get_dated_queryset(request, allow_future=allow_future, **lookup_kwargs)
         

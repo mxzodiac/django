@@ -257,4 +257,33 @@ class MonthViewTests(TestCase):
     def test_month_view_invalid_pattern(self):
         self.assertRaises(TypeError, self.client.get, '/dates/books/2007/no_month/')
         
-    
+class WeekViewTests(TestCase):
+    fixtures = ['generic-views-test-data.json']
+    urls = 'modeltests.generic_views.urls'
+
+    def test_week_view(self):
+        res = self.client.get('/dates/books/2008/week/39/')
+        self.assertEqual(res.status_code, 200)
+        self.assertTemplateUsed(res, 'generic_views/book_archive_year.html')
+        self.assertEqual(res.context['books'][0], Book.objects.get(pubdate=datetime.date(2008, 10, 1)))
+        self.assertEqual(res.context['week'], datetime.date(2008, 9, 28))
+        
+    def test_week_view_allow_empty(self):
+        res = self.client.get('/dates/books/2008/week/12/')
+        self.assertEqual(res.status_code, 404)
+        
+        res = self.client.get('/dates/books/2008/week/12/allow_empty/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(list(res.context['books']), [])
+        
+    def test_week_view_allow_future(self):
+        future = datetime.date(datetime.date.today().year + 1, 1, 1)
+        b = Book.objects.create(name="The New New Testement", pages=600, pubdate=future)
+        
+        res = self.client.get('/dates/books/%s/week/0/' % future.year)
+        self.assertEqual(res.status_code, 404)
+
+        res = self.client.get('/dates/books/%s/week/0/allow_future/' % future.year)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(list(res.context['books']), [b])
+        
