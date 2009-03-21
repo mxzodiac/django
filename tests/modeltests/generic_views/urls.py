@@ -33,6 +33,7 @@ urlpatterns = patterns('',
 
     # MonthView
     (r'^dates/books/(\d{4})/([a-z]{3})/$',              views.BookMonthArchive()),
+    (r'^dates/books/(\d{4})/(\d{1,2})/$',               views.BookMonthArchive(month_format='%m')),
     (r'^dates/books/(\d{4})/([a-z]{3})/allow_empty/$',  views.BookMonthArchive(allow_empty=True)),
     (r'^dates/books/(\d{4})/([a-z]{3})/allow_future/$', views.BookMonthArchive(allow_future=True)),
     (r'^dates/books/(\d{4})/no_month/$',                views.BookMonthArchive()),

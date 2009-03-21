@@ -203,7 +203,7 @@ class MonthViewTests(TestCase):
         # Since allow_empty=False, next/prev months must be valid (#7164)
         self.assertEqual(res.context['next_month'](), None)
         self.assertEqual(res.context['previous_month'](), datetime.date(2006, 5, 1))
-        
+    
     def test_month_view_allow_empty(self):
         # allow_empty = False, empty month
         res = self.client.get('/dates/books/2000/jan/')
@@ -253,7 +253,11 @@ class MonthViewTests(TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.context['next_month'](), future)
         self.assertEqual(res.context['previous_month'](), datetime.date(2006, 5, 1))
-        
+    
+    def test_custom_month_format(self):
+        res = self.client.get('/dates/books/2008/10/')
+        self.assertEqual(res.status_code, 200)
+    
     def test_month_view_invalid_pattern(self):
         self.assertRaises(TypeError, self.client.get, '/dates/books/2007/no_month/')
         
@@ -286,4 +290,7 @@ class WeekViewTests(TestCase):
         res = self.client.get('/dates/books/%s/week/0/allow_future/' % future.year)
         self.assertEqual(res.status_code, 200)
         self.assertEqual(list(res.context['books']), [b])
+        
+    def test_week_view_invalid_pattern(self):
+        self.assertRaises(TypeError, self.client.get, '/dates/books/2007/week/no_week/')
         

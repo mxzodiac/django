@@ -358,7 +358,7 @@ class WeekView(DateView):
         qs = self.get_dated_queryset(request, allow_future=allow_future, **lookup_kwargs)
         
         return (None, qs, {'week': date})
-
+        
 def _date_from_string(year, year_format, month, month_format, day='', day_format='', delim='__'):
     """
     Helper: get a datetime.date object given a format string and a year,
