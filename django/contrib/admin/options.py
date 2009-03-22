@@ -417,7 +417,7 @@ class ModelAdmin(BaseModelAdmin):
 
     def get_actions(self, request=None):
         actions = {}
-        for klass in self.__class__.mro()[::-1]:
+        for klass in [self.admin_site] + self.__class__.mro()[::-1]:
             for action in getattr(klass, 'actions', []):
                 func, name, description = self.get_action(action)
                 actions[name] = (func, name, description)
