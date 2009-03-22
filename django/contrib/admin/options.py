@@ -660,7 +660,7 @@ class ModelAdmin(BaseModelAdmin):
                 if isinstance(response, HttpResponse):
                     return response
                 else:
-                    redirect_to = request.META.get('HTTP_REFERER') or "."
+                    redirect_to = "."
                     return HttpResponseRedirect(redirect_to)
         else:
             action_form = self.action_form(auto_id=None)
