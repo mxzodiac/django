@@ -739,7 +739,7 @@ class AdminViewListEditable(TestCase):
 
     def tearDown(self):
         self.client.logout()
-    
+
     def test_changelist_input_html(self):
         response = self.client.get('/test_admin/admin/admin_views/person/')
         # 2 inputs per object(the field and the hidden id field) = 6
@@ -751,18 +751,18 @@ class AdminViewListEditable(TestCase):
         self.failUnlessEqual(response.content.count("<input"), 15)
         # 1 select per object = 3 selects
         self.failUnlessEqual(response.content.count("<select"), 4)
-    
+
     def test_post_submission(self):
         data = {
             "form-TOTAL_FORMS": "3",
             "form-INITIAL_FORMS": "3",
-            
+
             "form-0-gender": "1",
             "form-0-id": "1",
-            
+
             "form-1-gender": "2",
             "form-1-id": "2",
-            
+
             "form-2-alive": "checked",
             "form-2-gender": "1",
             "form-2-id": "3",
@@ -771,34 +771,34 @@ class AdminViewListEditable(TestCase):
 
         self.failUnlessEqual(Person.objects.get(name="John Mauchly").alive, False)
         self.failUnlessEqual(Person.objects.get(name="Grace Hooper").gender, 2)
-        
+
         # test a filtered page
         data = {
             "form-TOTAL_FORMS": "2",
             "form-INITIAL_FORMS": "2",
-            
+
             "form-0-id": "1",
             "form-0-gender": "1",
             "form-0-alive": "checked",
-            
+
             "form-1-id": "3",
             "form-1-gender": "1",
             "form-1-alive": "checked",
         }
         self.client.post('/test_admin/admin/admin_views/person/?gender__exact=1', data)
-        
+
         self.failUnlessEqual(Person.objects.get(name="John Mauchly").alive, True)
-        
+
         # test a searched page
         data = {
             "form-TOTAL_FORMS": "1",
             "form-INITIAL_FORMS": "1",
-            
+
             "form-0-id": "1",
             "form-0-gender": "1"
         }
         self.client.post('/test_admin/admin/admin_views/person/?q=mauchly', data)
-        
+
         self.failUnlessEqual(Person.objects.get(name="John Mauchly").alive, False)
 
 class AdminInheritedInlinesTest(TestCase):
@@ -915,6 +915,7 @@ class AdminActionsTest(TestCase):
         }
         confirmation = self.client.post('/test_admin/admin/admin_views/subscriber/', action_data)
         self.assertContains(confirmation, "Are you sure you want to delete the selected subscriber objects")
+        self.failUnless(confirmation.content.count(ACTION_CHECKBOX_NAME) == 2)
         response = self.client.post('/test_admin/admin/admin_views/subscriber/', delete_confirmation_data)
         self.failUnlessEqual(Subscriber.objects.count(), 0)
 
