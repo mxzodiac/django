@@ -656,9 +656,7 @@ class ModelAdmin(BaseModelAdmin):
                 func, name, description = self.get_actions(request)[action]
                 selected = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
                 results = queryset.filter(pk__in=selected)
-                response = None
-                if callable(func):
-                    response = func(request, results)
+                response = func(request, results)
                 if isinstance(response, HttpResponse):
                     return response
                 else:
