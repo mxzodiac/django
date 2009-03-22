@@ -243,83 +243,18 @@ class MonthView(DateView):
     def get_next_month(self, request, date):
         """
         Get the next valid month.
-        
-        This is a bit complicated:
-        
-            * If allow_empty and allow_future are both true, this is easy:
-              just return the next month.
-              
-            * If allow_empty is true and the next month isn't in the future,
-              then return the next month.
-              
-            * If allow_empty is true and the next month *is* in the future,
-              then return None.
-              
-            * If allow_empty is false and allow_future is true, return the
-              next month *that contains a valid object*, even if it's in the 
-              future. If there are no next objects, return None.
-              
-            * If allow_empty is false and allow_future is false, return the
-              next month that contains a valid object. If that month is in
-              the future, or if there are no next objects, return None.
-              
         """
         first_day, last_day = _month_bounds(date)
-        date_field = self.get_date_field(request)
-        allow_empty = self.get_allow_empty(request)
-        allow_future = self.get_allow_future(request)
-        
-        # Naively get the next month. This only works if allow_empty is True,
-        # but it's cheap.
         next = (last_day + datetime.timedelta(days=1)).replace(day=1)
-                    
-        # Only perform a database hit if we need to find a month that actually
-        # has data in it. We'll do that by looking up an object with a date at
-        # least in the next month.
-        if not allow_empty:
-            qs = self.get_queryset(request)\
-                     .filter(**{'%s__gte' % date_field: next})\
-                     .order_by(date_field)
-            try:
-                obj = qs[0]
-            except IndexError:
-                next = None
-            else:
-                next = getattr(obj, date_field).replace(day=1)
-        
-        return _check_date(next, allow_future)
+        return _get_next_prev_month(self, request, next, is_previous=False, use_first_day=True)
             
     def get_previous_month(self, request, date):
         """
         Get the previous valid month.
-        
-        The logic below works similarly to the login in get_next_month; see
-        that docstring for why this is so complicated.
         """
         first_day, last_day = _month_bounds(date)
-        date_field = self.get_date_field(request)
-        allow_empty = self.get_allow_empty(request)
-        allow_future = self.get_allow_future(request)
-        
-        # Naively get the previous month. This only works if allow_empty is
-        # True but it's cheap.
         prev = (first_day - datetime.timedelta(days=1)).replace(day=1)
-        
-        # Only perform a database hit if we need to find a month that actually
-        # has data in it. We'll do that by looking up an object with a date at
-        # least in the previous month.
-        if not allow_empty:
-            qs = self.get_queryset(request)\
-                     .filter(**{'%s__lte' % date_field: prev})\
-                     .order_by('-%s' % date_field)
-            try:
-                obj = qs[0]
-            except IndexError:
-                prev = None
-            else:
-                prev = getattr(obj, date_field).replace(day=1)
-            
-        return _check_date(prev, allow_future)
+        return _get_next_prev_month(self, request, prev, is_previous=True, use_first_day=True)
 
     def get_month_format(self, request):
         """
@@ -419,65 +354,17 @@ class DayView(DateView):
     def get_next_day(self, request, date):
         """
         Get the next valid day.
-        
-        This is complex in much the same way that MonthView.get_next_month is;
-        see the docstring there for details.
         """
-        date_field = self.get_date_field(request)
-        allow_empty = self.get_allow_empty(request)
-        allow_future = self.get_allow_future(request)
-        
-        # Naively get the next day. This only works if allow_empty is True,
-        # but it's cheap.
         next = date + datetime.timedelta(days=1)
-                    
-        # Only perform a database hit if we need to find a day that actually
-        # has data in it. We'll do that by looking up an object with a date at
-        # least in the next day.
-        if not allow_empty:
-            qs = self.get_queryset(request)\
-                     .filter(**{'%s__gte' % date_field: next})\
-                     .order_by(date_field)
-            try:
-                obj = qs[0]
-            except IndexError:
-                next = None
-            else:
-                next = getattr(obj, date_field)
-        
-        return _check_date(next, allow_future)
+        return _get_next_prev_month(self, request, next, is_previous=False, use_first_day=False)
     
     def get_previous_day(self, request, date):
         """
         Get the previous valid day.
-        
-        See the docstring for MonthView.get_next_month for details on why this
-        is so complex.
         """
-        date_field = self.get_date_field(request)
-        allow_empty = self.get_allow_empty(request)
-        allow_future = self.get_allow_future(request)
-        
-        # Naively get the previous month. This only works if allow_empty is
-        # True but it's cheap.
         prev = date - datetime.timedelta(days=1)
-        
-        # Only perform a database hit if we need to find a day that actually
-        # has data in it. We'll do that by looking up an object with a date at
-        # least in the previous day.
-        if not allow_empty:
-            qs = self.get_queryset(request)\
-                     .filter(**{'%s__lte' % date_field: prev})\
-                     .order_by('-%s' % date_field)
-            try:
-                obj = qs[0]
-            except IndexError:
-                prev = None
-            else:
-                prev = getattr(obj, date_field)
-            
-        return _check_date(prev, allow_future)
-        
+        return _get_next_prev_month(self, request, prev, is_previous=True, use_first_day=False)
+
     def get_month_format(self, request):
         """
         Get a month format string in strptime syntax to be used to parse the
@@ -516,17 +403,75 @@ def _month_bounds(date):
     
     return first_day, last_day
 
-def _check_date(date, allow_future):
+def _get_next_prev_month(generic_view, request, naive_result, is_previous, use_first_day):
     """
-    Helper: return None if allow_future is False and the date is in the
-    future; otherwise return the date.
+    Helper: Get the next or the previous valid date. The idea is to allow
+    links on month/day views to never be 404s by never providing a date
+    that'll be invalid for the given view.
+    
+    This is a bit complicated since it handles both next and previous months
+    and days (for MonthView and DayView); hence the coupling to generic_view.
+    
+    However in essance the logic comes down to:
+    
+        * If allow_empty and allow_future are both true, this is easy: just
+          return the naive result (just the next/previous day or month,
+          reguardless of object existence.)
+          
+        * If allow_empty is true, allow_future is false, and the naive month
+          isn't in the future, then return it; otherwise return None.
+                    
+        * If allow_empty is false and allow_future is true, return the next
+          date *that contains a valid object*, even if it's in the future. If
+          there are no next objects, return None.
+          
+        * If allow_empty is false and allow_future is false, return the next
+          date that contains a valid object. If that date is in the future, or
+          if there are no next objects, return None.
+          
     """
-    # Convert a datetime to a date
-    if hasattr(date, 'date'):
-        date = date.date()
+    date_field = generic_view.get_date_field(request)
+    allow_empty = generic_view.get_allow_empty(request)
+    allow_future = generic_view.get_allow_future(request)
+    
+    # If allow_empty is True the naive value will be valid
+    if allow_empty:
+        result = naive_result
         
+    # Otherwise, we'll need to go to the database to look for an object
+    # whose date_field is at least (greater than/less than) the given
+    # naive result
+    else:
+        # Construct a lookup and an ordering depending on weather we're doing
+        # a previous date or a next date lookup.
+        if is_previous:
+            lookup = {'%s__lte' % date_field: naive_result}
+            ordering = '-%s' % date_field
+        else:
+            lookup = {'%s__gte' % date_field: naive_result}
+            ordering = date_field
+        
+        qs = generic_view.get_queryset(request).filter(**lookup).order_by(ordering)
+
+        # Snag the first object from the queryset; if it doesn't exist that 
+        # means there's no next/previous link available.
+        try:
+            result = getattr(qs[0], date_field)
+        except IndexError:
+            result = None
+    
+    # Convert datetimes to a dates
+    if hasattr(result, 'date'):
+        result = result.date()
+
+    # For month views, we always want to have a date that's the first of the
+    # month for consistancy's sake.
+    if result and use_first_day:
+        result = result.replace(day=1)
+    
     # Check against future dates.
-    if date and (allow_future or date < datetime.date.today()):
-        return date
+    if result and (allow_future or result < datetime.date.today()):
+        return result
     else:
         return None
+
