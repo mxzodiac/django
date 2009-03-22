@@ -174,7 +174,7 @@ class ModelAdmin(BaseModelAdmin):
     "Encapsulates all admin options and functionality for a given model."
     __metaclass__ = forms.MediaDefiningClass
 
-    list_display = ('action_checkbox', '__str__',)
+    list_display = ('__str__',)
     list_display_links = ()
     list_filter = ()
     list_select_related = False
@@ -208,8 +208,7 @@ class ModelAdmin(BaseModelAdmin):
             inline_instance = inline_class(self.model, self.admin_site)
             self.inline_instances.append(inline_instance)
         if 'action_checkbox' not in self.list_display:
-            self.list_display = list(self.list_display)
-            self.list_display.insert(0, 'action_checkbox')
+            self.list_display = ['action_checkbox'] +  list(self.list_display)
         if not self.list_display_links:
             for name in self.list_display:
                 if name != 'action_checkbox':
