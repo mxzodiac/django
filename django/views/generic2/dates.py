@@ -3,7 +3,7 @@ import datetime
 from django.db import models
 from django.core.exceptions import ImproperlyConfigured
 from django.http import Http404
-from django.views.generic2 import ListView
+from django.views.generic2 import ListView, DetailView
 
 class DateView(ListView):
     """
@@ -76,6 +76,8 @@ class DateView(ListView):
         """
         Get the name of the date field to be used to filter by.
         """
+        if self.date_field is None:
+            raise ImproperlyConfigured("%s.date_field is required." % self.__class__.__name__)
         return self.date_field
     
     def get_allow_future(self, request):
@@ -218,26 +220,10 @@ class MonthView(DateView):
         qs = self.get_dated_queryset(request, allow_future=allow_future, **lookup_kwargs)
         date_list = self.get_date_list(request, qs, 'day')
         
-        # Construct a set of callbacks for getting the next and previous 
-        # months. This can be expensive -- see get_next/previous_month for
-        # details -- so we need to memoize them. We'll do this by creating
-        # a couple of closures over a cache dict; remember that storing state
-        # on self is right out.
-        memo = {}
-        def get_next_month():
-            if 'next' not in memo:
-                memo['next'] = self.get_next_month(request, date)
-            return memo['next']
-            
-        def get_previous_month():
-            if 'prev' not in memo:
-                memo['prev'] = self.get_previous_month(request, date)
-            return memo['prev']
-        
         return (date_list, qs, {
             'month': date,
-            'next_month': get_next_month,
-            'previous_month': get_previous_month,
+            'next_month': self.get_next_month(request, date),
+            'previous_month': self.get_previous_month(request, date),
         })
 
     def get_next_month(self, request, date):
@@ -324,42 +310,17 @@ class DayView(DateView):
         date object so that TodayView can be trivial.
         """
         date_field = self.get_date_field(request)
-        
-        # If the date field is a DateTimeField, we can't just do
-        # filter(df=date) because that doesn't take the time into account. 
-        # So we need to make a range for the lookup.
-        model = self.get_queryset(request).model
-        if isinstance(model._meta.get_field(date_field), models.DateTimeField):
-            date_range = (
-                datetime.datetime.combine(date, datetime.time.min), 
-                datetime.datetime.combine(date, datetime.time.max)
-            )
-            lookup_kwargs = {'%s__range' % date_field: date_range}
-        else:
-            lookup_kwargs = {date_field: date}
-        
         allow_future = self.get_allow_future(request)
-        qs = self.get_dated_queryset(request, allow_future=allow_future, **lookup_kwargs)
 
-        # Construct a set of callbacks for getting the next and previous 
-        # days. This isn't as expensive as getting the next and previous months,
-        # but only just, so again we'll memoize 'em as we do above for
-        # MonthView.
-        memo = {}
-        def get_next_day():
-            if 'next' not in memo:
-                memo['next'] = self.get_next_day(request, date)
-            return memo['next']
-            
-        def get_previous_day():
-            if 'prev' not in memo:
-                memo['prev'] = self.get_previous_day(request, date)
-            return memo['prev']
+        field = self.get_queryset(request).model._meta.get_field(date_field)
+        lookup_kwargs = _date_lookup_for_field(field, date)
+        
+        qs = self.get_dated_queryset(request, allow_future=allow_future, **lookup_kwargs)
         
         return (None, qs, {
             'day': date, 
-            'previous_day': get_previous_day, 
-            'next_day': get_next_day
+            'previous_day': self.get_previous_day(request, date), 
+            'next_day': self.get_next_day(request, date)
         })
 
     def get_next_day(self, request, date):
@@ -400,7 +361,75 @@ class TodayView(DayView):
         Return (date_list, items, extra_context) for this request.
         """
         return self._get_dated_items(request, datetime.date.today())
+
+class DateDetailView(DetailView):
+    """
+    Detail view of a single object on a single date; this differs from the
+    standard DetailView by accepting a year/month/day in the URL.
+    """
+    def __init__(self, **kwargs):
+        self._load_config_values(kwargs, 
+            date_field = None,
+            month_format = '%b',
+            day_format = '%d',
+            allow_future = False,
+        )
+        super(DateDetailView, self).__init__(**kwargs)
+
+    def get_object(self, request, year, month, day, pk=None, slug=None, object_id=None):
+        """
+        Get the object this request displays.        
+        """        
+        date = _date_from_string(year, '%Y', 
+                                 month, self.get_month_format(request), 
+                                 day, self.get_day_format(request))
+
+        qs = self.get_queryset(request)
+
+        if not self.get_allow_future(request) and date > datetime.date.today():
+            raise Http404("Future %s not available because %s.allow_future is False." \
+                          % (qs.model._meta.verbose_name_plural, self.__class__.__name__))
         
+        # Filter down a queryset from self.queryset using the date from the
+        # URL. This'll get passed as the queryset to DetailView.get_object,
+        # which'll handle the 404
+        date_field = self.get_date_field(request)
+        field = qs.model._meta.get_field(date_field)
+        lookup = _date_lookup_for_field(field, date)
+        qs = qs.filter(**lookup)
+        
+        return super(DateDetailView, self).get_object(request,
+            queryset=qs, pk=pk, slug=slug, object_id=object_id)
+        
+    def get_date_field(self, request):
+        """
+        Get the name of the date field to be used to filter by.
+        """
+        if self.date_field is None:
+            raise ImproperlyConfigured("%s.date_field is required." % self.__class__.__name__)
+        return self.date_field
+    
+    def get_month_format(self, request):
+        """
+        Get a month format string in strptime syntax to be used to parse the
+        month from url variables.
+        """
+        return self.month_format
+    
+    def get_day_format(self, request):
+        """
+        Get a day format string in strptime syntax to be used to parse the
+        month from url variables.
+        """
+        return self.day_format
+        
+    def get_allow_future(self, request):
+        """
+        Returns `True` if the view should be allowed to display objects from 
+        the future.
+        """
+        return self.allow_future    
+    
 def _date_from_string(year, year_format, month, month_format, day='', day_format='', delim='__'):
     """
     Helper: get a datetime.date object given a format string and a year,
@@ -497,3 +526,19 @@ def _get_next_prev_month(generic_view, request, naive_result, is_previous, use_f
     else:
         return None
 
+def _date_lookup_for_field(field, date):
+    """
+    Get the lookup kwargs for looking up a date against a given Field. If the
+    date field is a DateTimeField, we can't just do filter(df=date) because
+    that doesn't take the time into account. So we need to make a range lookup
+    in those cases.
+    """
+    if isinstance(field, models.DateTimeField):
+        date_range = (
+            datetime.datetime.combine(date, datetime.time.min), 
+            datetime.datetime.combine(date, datetime.time.max)
+        )
+        return {'%s__range' % field.name: date_range}
+    else:
+        return {field.name: date}
+    

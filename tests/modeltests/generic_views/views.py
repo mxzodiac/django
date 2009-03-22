@@ -42,3 +42,6 @@ class BookDayArchive(BookConfig, generic.DayView):
     
 class BookTodayArchive(BookConfig, generic.TodayView):
     pass
+
+class BookDetail(BookConfig, generic.DateDetailView):
+    pass

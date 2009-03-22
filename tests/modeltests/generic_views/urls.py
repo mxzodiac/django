@@ -55,4 +55,11 @@ urlpatterns = patterns('',
     (r'dates/books/today/$',              views.BookTodayArchive()),
     (r'dates/books/today/allow_empty/$',  views.BookTodayArchive(allow_empty=True)),
     
+    # DateDetailView
+    (r'^dates/books/(\d{4})/([a-z]{3})/(\d{1,2})/(\d+)/$',              views.BookDetail()),
+    (r'^dates/books/(\d{4})/(\d{1,2})/(\d{1,2})/(\d+)/$',               views.BookDetail(month_format='%m')),
+    (r'^dates/books/(\d{4})/([a-z]{3})/(\d{1,2})/(\d+)/allow_future/$', views.BookDetail(allow_future=True)),
+    (r'^dates/books/(\d{4})/([a-z]{3})/(\d{1,2})/nopk/$',               views.BookDetail()),
+    
+    (r'^dates/books/(?P<year>\d{4})/(?P<month>[a-z]{3})/(?P<day>\d{1,2})/byslug/(?P<slug>[\w-]+)/$', views.BookDetail()),
 )

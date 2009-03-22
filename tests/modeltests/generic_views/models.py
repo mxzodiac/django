@@ -12,6 +12,7 @@ class Author(models.Model):
 
 class Book(models.Model):
    name = models.CharField(max_length=300)
+   slug = models.SlugField()
    pages = models.IntegerField()
    authors = models.ManyToManyField(Author)
    pubdate = models.DateField()

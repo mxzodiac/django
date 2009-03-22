@@ -1,5 +1,4 @@
 import re
-from django import template
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from django.http import Http404
 from django.views.generic2 import GenericView
@@ -21,50 +20,51 @@ class DetailView(GenericView):
         )
         super(DetailView, self).__init__(**kwargs)
     
-    def __call__(self, request, **kwargs):
-        obj = self.get_object(request, **kwargs)
+    def __call__(self, request, *args, **kwargs):
+        obj = self.get_object(request, *args, **kwargs)
         return super(DetailView, self).__call__(request, object=obj)
         
-    def get_object(self, request, **kwargs):
+    def get_object(self, request, pk=None, slug=None, object_id=None, queryset=None):
         """
         Get the object this request wraps. By default this requires
         `self.queryset` and a `pk` or `slug` argument in the URLconf, but
         subclasses can override this to return any object.
         """
-        qs = self.get_queryset(request)
+        # Use a custom queryset if provided; this is required for subclasses
+        # like DateDetailView
+        if queryset is None:
+            queryset = self.get_queryset(request)
         
-        # Look up an object from the provided queryset.
-        
-        # First, try looking up by primary key.
-        if 'pk' in kwargs:
-            qs = qs.filter(pk=kwargs.pop('pk'))
+        # Next, try looking up by primary key.
+        if pk:
+            queryset = queryset.filter(pk=pk)
 
         # Next, try looking up by slug.
-        elif 'slug' in kwargs:
+        elif slug:
             slug_field = self.get_slug_field(request)
-            qs = qs.filter(**{slug_field: kwargs.pop('slug')})
+            queryset = queryset.filter(**{slug_field: slug})
         
         # Finally, look for the (deprecated) object_id argument.
-        elif 'object_id' in kwargs:
+        elif object_id:
             import warnings
             warnings.warn(
                 "The 'object_id' parameter to generic views is deprecated. "\
                 "Use 'pk' instead.",
                 PendingDeprecationWarning
             )
-            qs = qs.filter(pk=kwargs.pop('object_id'))
+            queryset = queryset.filter(pk=object_id)
         
         # If none of those are defined, it's an error.
         else:
             raise AttributeError("Generic detail view %s must be called with "\
                                  "either an object id or a slug." \
                                  % self.__class__.__name__)
-            
+        
         try:
-            return qs.get()
+            return queryset.get()
         except ObjectDoesNotExist:
             raise Http404("No %s found matching the query" % \
-                          (qs.model._meta.verbose_name))
+                          (queryset.model._meta.verbose_name))
 
     def get_queryset(self, request):
         """

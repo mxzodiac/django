@@ -15,8 +15,7 @@ class GenericView(object):
             template_name = None
         )
         if kwargs:
-            badkey = kwargs.iterkeys().next()
-            raise TypeError("__init__() got an unexpected keyword argument '%s'" % badkey)
+            raise TypeError("__init__() got an unexpected keyword argument '%s'" % iter(kwargs).next())
     
     def __call__(self, request, object=None):
         template = self.get_template(request, object)
