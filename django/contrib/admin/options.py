@@ -488,6 +488,7 @@ class ModelAdmin(BaseModelAdmin):
             "opts": opts,
             "root_path": self.admin_site.root_path,
             "app_label": app_label,
+            'action_checkbox_name': helpers.ACTION_CHECKBOX_NAME,
         }
         return render_to_response(self.delete_confirmation_template or [
             "admin/%s/%s/delete_selected_confirmation.html" % (app_label, opts.object_name.lower()),

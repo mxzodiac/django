@@ -26,7 +26,7 @@
     <form action="" method="post">
     <div>
     {% for s in selected %}
-    <input type="hidden" name="_selected_action" value="{{ s.pk }}" />
+    <input type="hidden" name="{{ action_checkbox_name }}" value="{{ s.pk }}" />
     {% endfor %}
     <input type="hidden" name="action" value="delete_selected" />
     <input type="hidden" name="post" value="yes" />
