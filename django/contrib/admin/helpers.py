@@ -8,7 +8,7 @@ from django.contrib.admin.util import flatten_fieldsets
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import ugettext_lazy as _
 
-ACTION_CHECKBOX_NAME = 'selected'
+ACTION_CHECKBOX_NAME = '_selected_action'
 
 class ActionForm(forms.Form):
     action = forms.ChoiceField(label=_('Action:'))
@@ -140,11 +140,11 @@ class InlineAdminForm(AdminForm):
             self.original.content_type_id = ContentType.objects.get_for_model(original).pk
         self.show_url = original and hasattr(original, 'get_absolute_url')
         super(InlineAdminForm, self).__init__(form, fieldsets, prepopulated_fields)
-    
+
     def __iter__(self):
         for name, options in self.fieldsets:
             yield InlineFieldset(self.formset, self.form, name, **options)
-    
+
     def field_count(self):
         # tabular.html uses this function for colspan value.
         num_of_fields = 1 # always has at least one field
@@ -157,7 +157,7 @@ class InlineAdminForm(AdminForm):
 
     def pk_field(self):
         return AdminField(self.form, self.formset._pk_field.name, False)
-    
+
     def fk_field(self):
         fk = getattr(self.formset, "fk", None)
         if fk:
@@ -177,14 +177,14 @@ class InlineFieldset(Fieldset):
     def __init__(self, formset, *args, **kwargs):
         self.formset = formset
         super(InlineFieldset, self).__init__(*args, **kwargs)
-        
+
     def __iter__(self):
         fk = getattr(self.formset, "fk", None)
         for field in self.fields:
             if fk and fk.name == field:
                 continue
             yield Fieldline(self.form, field)
-            
+
 class AdminErrorList(forms.util.ErrorList):
     """
     Stores all errors for the form/formsets in an add/change stage view.

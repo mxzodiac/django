@@ -174,7 +174,7 @@ class ModelAdmin(BaseModelAdmin):
     "Encapsulates all admin options and functionality for a given model."
     __metaclass__ = forms.MediaDefiningClass
 
-    list_display = ('action_checkbox', '__str__',)
+    list_display = ('__str__',)
     list_display_links = ()
     list_filter = ()
     list_select_related = False
@@ -208,8 +208,7 @@ class ModelAdmin(BaseModelAdmin):
             inline_instance = inline_class(self.model, self.admin_site)
             self.inline_instances.append(inline_instance)
         if 'action_checkbox' not in self.list_display:
-            self.list_display = list(self.list_display)
-            self.list_display.insert(0, 'action_checkbox')
+            self.list_display = ['action_checkbox'] +  list(self.list_display)
         if not self.list_display_links:
             for name in self.list_display:
                 if name != 'action_checkbox':
@@ -418,7 +417,7 @@ class ModelAdmin(BaseModelAdmin):
 
     def get_actions(self, request=None):
         actions = {}
-        for klass in self.__class__.mro():
+        for klass in [self.admin_site] + self.__class__.mro()[::-1]:
             for action in getattr(klass, 'actions', []):
                 func, name, description = self.get_action(action)
                 actions[name] = (func, name, description)
@@ -489,6 +488,7 @@ class ModelAdmin(BaseModelAdmin):
             "opts": opts,
             "root_path": self.admin_site.root_path,
             "app_label": app_label,
+            'action_checkbox_name': helpers.ACTION_CHECKBOX_NAME,
         }
         return render_to_response(self.delete_confirmation_template or [
             "admin/%s/%s/delete_selected_confirmation.html" % (app_label, opts.object_name.lower()),
@@ -657,13 +657,11 @@ class ModelAdmin(BaseModelAdmin):
                 func, name, description = self.get_actions(request)[action]
                 selected = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
                 results = queryset.filter(pk__in=selected)
-                response = None
-                if callable(func):
-                    response = func(request, results)
+                response = func(request, results)
                 if isinstance(response, HttpResponse):
                     return response
                 else:
-                    redirect_to = request.META.get('HTTP_REFERER') or "."
+                    redirect_to = "."
                     return HttpResponseRedirect(redirect_to)
         else:
             action_form = self.action_form(auto_id=None)
