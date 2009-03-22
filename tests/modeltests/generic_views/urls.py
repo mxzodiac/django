@@ -50,4 +50,9 @@ urlpatterns = patterns('',
     (r'^dates/books/(\d{4})/([a-z]{3})/(\d{1,2})/allow_empty/$',  views.BookDayArchive(allow_empty=True)),
     (r'^dates/books/(\d{4})/([a-z]{3})/(\d{1,2})/allow_future/$', views.BookDayArchive(allow_future=True)),
     (r'^dates/books/(\d{4})/([a-z]{3})/no_day/$',                 views.BookDayArchive()),
+    
+    # TodayView
+    (r'dates/books/today/$',              views.BookTodayArchive()),
+    (r'dates/books/today/allow_empty/$',  views.BookTodayArchive(allow_empty=True)),
+    
 )

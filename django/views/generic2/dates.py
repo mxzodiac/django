@@ -296,6 +296,9 @@ class WeekView(DateView):
         return (None, qs, {'week': date})
 
 class DayView(DateView):
+    """
+    List of objects published on a given day.
+    """
     
     _template_name_suffix = "archive_day"
     
@@ -305,15 +308,23 @@ class DayView(DateView):
         self._load_config_values(kwargs, month_format='%b', day_format='%d')
         super(DayView, self).__init__(allow_empty=allow_empty, **kwargs)
 
-    def get_dated_items(self, request, year, month, day):
+    def get_dated_items(self, request, year, month, day, date=None):
         """
         Return (date_list, items, extra_context) for this request.
         """
-        date_field = self.get_date_field(request)
         date = _date_from_string(year, '%Y', 
                                  month, self.get_month_format(request), 
                                  day, self.get_day_format(request))
 
+        return self._get_dated_items(request, date)
+        
+    def _get_dated_items(self, request, date):
+        """
+        Do the actual heavy lifting of getting the dated items; this accepts a
+        date object so that TodayView can be trivial.
+        """
+        date_field = self.get_date_field(request)
+        
         # If the date field is a DateTimeField, we can't just do
         # filter(df=date) because that doesn't take the time into account. 
         # So we need to make a range for the lookup.
@@ -378,7 +389,18 @@ class DayView(DateView):
         month from url variables.
         """
         return self.day_format
+        
+class TodayView(DayView):
+    """
+    List of objects published today.
+    """
     
+    def get_dated_items(self, request):
+        """
+        Return (date_list, items, extra_context) for this request.
+        """
+        return self._get_dated_items(request, datetime.date.today())
+        
 def _date_from_string(year, year_format, month, month_format, day='', day_format='', delim='__'):
     """
     Helper: get a datetime.date object given a format string and a year,

@@ -21,22 +21,24 @@ class ObjectDetail(generic.DetailView):
     def get_object(self, request, **kwargs):
         return {'foo': 'bar'}
 
-class BookArchive(generic.ArchiveView):
+class BookConfig(object):
     queryset = Book.objects.all()
     date_field = 'pubdate'
 
-class BookYearArchive(generic.YearView):
-    queryset = Book.objects.all()
-    date_field = 'pubdate'
+class BookArchive(BookConfig, generic.ArchiveView):
+    pass
+
+class BookYearArchive(BookConfig, generic.YearView):
+    pass
     
-class BookMonthArchive(generic.MonthView):
-    queryset = Book.objects.all()
-    date_field = 'pubdate'
+class BookMonthArchive(BookConfig, generic.MonthView):
+    pass
     
-class BookWeekArchive(generic.WeekView):
-    queryset = Book.objects.all()
-    date_field = 'pubdate'
+class BookWeekArchive(BookConfig, generic.WeekView):
+    pass
     
-class BookDayArchive(generic.DayView):
-    queryset = Book.objects.all()
-    date_field = 'pubdate'
+class BookDayArchive(BookConfig, generic.DayView):
+    pass
+    
+class BookTodayArchive(BookConfig, generic.TodayView):
+    pass
