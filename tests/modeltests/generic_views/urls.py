@@ -44,4 +44,10 @@ urlpatterns = patterns('',
     (r'^dates/books/(\d{4})/week/(\d{1,2})/allow_future/$', views.BookWeekArchive(allow_future=True)),
     (r'^dates/books/(\d{4})/week/no_week/$',                views.BookWeekArchive()),
     
+    # DayView
+    (r'^dates/books/(\d{4})/([a-z]{3})/(\d{1,2})/$',              views.BookDayArchive()),
+    (r'^dates/books/(\d{4})/(\d{1,2})/(\d{1,2})/$',               views.BookDayArchive(month_format='%m')),
+    (r'^dates/books/(\d{4})/([a-z]{3})/(\d{1,2})/allow_empty/$',  views.BookDayArchive(allow_empty=True)),
+    (r'^dates/books/(\d{4})/([a-z]{3})/(\d{1,2})/allow_future/$', views.BookDayArchive(allow_future=True)),
+    (r'^dates/books/(\d{4})/([a-z]{3})/no_day/$',                 views.BookDayArchive()),
 )

@@ -376,8 +376,8 @@ class DayView(DateView):
         """
         date_field = self.get_date_field(request)
         date = _date_from_string(year, '%Y', 
-                                 month, self.get_month_format(), 
-                                 day, self.get_day_format())
+                                 month, self.get_month_format(request), 
+                                 day, self.get_day_format(request))
 
         # If the date field is a DateTimeField, we can't just do
         # filter(df=date) because that doesn't take the time into account. 
@@ -420,12 +420,64 @@ class DayView(DateView):
         """
         Get the next valid day.
         
-        This is complex in much the same way that MonthView.get_next_day is;
+        This is complex in much the same way that MonthView.get_next_month is;
         see the docstring there for details.
         """
+        date_field = self.get_date_field(request)
+        allow_empty = self.get_allow_empty(request)
+        allow_future = self.get_allow_future(request)
         
+        # Naively get the next day. This only works if allow_empty is True,
+        # but it's cheap.
+        next = date + datetime.timedelta(days=1)
+                    
+        # Only perform a database hit if we need to find a day that actually
+        # has data in it. We'll do that by looking up an object with a date at
+        # least in the next day.
+        if not allow_empty:
+            qs = self.get_queryset(request)\
+                     .filter(**{'%s__gte' % date_field: next})\
+                     .order_by(date_field)
+            try:
+                obj = qs[0]
+            except IndexError:
+                next = None
+            else:
+                next = getattr(obj, date_field)
         
-
+        return _check_date(next, allow_future)
+    
+    def get_previous_day(self, request, date):
+        """
+        Get the previous valid day.
+        
+        See the docstring for MonthView.get_next_month for details on why this
+        is so complex.
+        """
+        date_field = self.get_date_field(request)
+        allow_empty = self.get_allow_empty(request)
+        allow_future = self.get_allow_future(request)
+        
+        # Naively get the previous month. This only works if allow_empty is
+        # True but it's cheap.
+        prev = date - datetime.timedelta(days=1)
+        
+        # Only perform a database hit if we need to find a day that actually
+        # has data in it. We'll do that by looking up an object with a date at
+        # least in the previous day.
+        if not allow_empty:
+            qs = self.get_queryset(request)\
+                     .filter(**{'%s__lte' % date_field: prev})\
+                     .order_by('-%s' % date_field)
+            try:
+                obj = qs[0]
+            except IndexError:
+                prev = None
+            else:
+                prev = getattr(obj, date_field)
+            
+        return _check_date(prev, allow_future)
+        
     def get_month_format(self, request):
         """
         Get a month format string in strptime syntax to be used to parse the
@@ -440,7 +492,6 @@ class DayView(DateView):
         """
         return self.day_format
     
-
 def _date_from_string(year, year_format, month, month_format, day='', day_format='', delim='__'):
     """
     Helper: get a datetime.date object given a format string and a year,

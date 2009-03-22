@@ -36,3 +36,7 @@ class BookMonthArchive(generic.MonthView):
 class BookWeekArchive(generic.WeekView):
     queryset = Book.objects.all()
     date_field = 'pubdate'
+    
+class BookDayArchive(generic.DayView):
+    queryset = Book.objects.all()
+    date_field = 'pubdate'

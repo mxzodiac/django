@@ -293,4 +293,73 @@ class WeekViewTests(TestCase):
         
     def test_week_view_invalid_pattern(self):
         self.assertRaises(TypeError, self.client.get, '/dates/books/2007/week/no_week/')
+
+class DayViewTests(TestCase):
+    fixtures = ['generic-views-test-data.json']
+    urls = 'modeltests.generic_views.urls'
+    
+    def test_day_view(self):
+        res = self.client.get('/dates/books/2008/oct/01/')
+        self.assertEqual(res.status_code, 200)
+        self.assertTemplateUsed(res, 'generic_views/book_archive_day.html')
+        self.assertEqual(list(res.context['books']), 
+                         list(Book.objects.filter(pubdate=datetime.date(2008, 10, 1))))
+        self.assertEqual(res.context['day'], datetime.date(2008, 10, 1))
         
+        # Since allow_empty=False, next/prev days must be valid.
+        self.assertEqual(res.context['next_day'](), None)
+        self.assertEqual(res.context['previous_day'](), datetime.date(2006, 5, 1))
+    
+    def test_day_view_allow_empty(self):
+        # allow_empty = False, empty month
+        res = self.client.get('/dates/books/2000/jan/1/')
+        self.assertEqual(res.status_code, 404)
+        
+        # allow_empty = True, empty month
+        res = self.client.get('/dates/books/2000/jan/1/allow_empty/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(list(res.context['books']), [])
+        self.assertEqual(res.context['day'], datetime.date(2000, 1, 1))
+        
+        # Since it's allow empty, next/prev are allowed to be empty months (#7164)
+        self.assertEqual(res.context['next_day'](), datetime.date(2000, 1, 2))
+        self.assertEqual(res.context['previous_day'](), datetime.date(1999, 12, 31))
+        
+        # allow_empty but not allow_future: next_month should be empty (#7164)
+        url = datetime.date.today().strftime('/dates/books/%Y/%b/%d/allow_empty/').lower()
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.context['next_day'](), None)
+
+    def test_day_view_allow_future(self):
+        future = (datetime.date.today() + datetime.timedelta(days=60))
+        urlbit = future.strftime('%Y/%b/%d').lower()
+        b = Book.objects.create(name="The New New Testement", pages=600, pubdate=future)
+        
+        # allow_future = False, future month
+        res = self.client.get('/dates/books/%s/' % urlbit)
+        self.assertEqual(res.status_code, 404)
+        
+        # allow_future = True, valid future month
+        res = self.client.get('/dates/books/%s/allow_future/' % urlbit)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(list(res.context['books']), [b])
+        self.assertEqual(res.context['day'], future)
+        
+        # allow_future but not allow_empty, next/prev amust be valid
+        self.assertEqual(res.context['next_day'](), None)
+        self.assertEqual(res.context['previous_day'](), datetime.date(2008, 10, 1))
+        
+        # allow_future, but not allow_empty, with a current month.
+        res = self.client.get('/dates/books/2008/oct/01/allow_future/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.context['next_day'](), future)
+        self.assertEqual(res.context['previous_day'](), datetime.date(2006, 5, 1))
+    
+    def test_custom_month_format(self):
+        res = self.client.get('/dates/books/2008/10/01/')
+        self.assertEqual(res.status_code, 200)
+    
+    def test_day_view_invalid_pattern(self):
+        self.assertRaises(TypeError, self.client.get, '/dates/books/2007/oct/no_day/')
+    
