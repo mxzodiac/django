@@ -196,8 +196,8 @@ class ModelAdmin(BaseModelAdmin):
     # Actions
     actions = ['delete_selected']
     action_form = helpers.ActionForm
-    actions_on_top = False
-    actions_on_bottom = True
+    actions_on_top = True
+    actions_on_bottom = False
 
     def __init__(self, model, admin_site):
         self.model = model
