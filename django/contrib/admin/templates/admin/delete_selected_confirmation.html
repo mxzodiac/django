@@ -20,13 +20,13 @@
     </ul>
 {% else %}
     <p>{% blocktrans %}Are you sure you want to delete the selected {{ object_name }} objects? All of the following objects and it's related items will be deleted:{% endblocktrans %}</p>
-    {% for d in deleted_objects %}
-        <ul>{{ d|unordered_list }}</ul>
+    {% for deleteable_object in deletable_objects %}
+        <ul>{{ deleteable_object|unordered_list }}</ul>
     {% endfor %}
     <form action="" method="post">
     <div>
-    {% for s in selected %}
-    <input type="hidden" name="{{ action_checkbox_name }}" value="{{ s.pk }}" />
+    {% for obj in queryset %}
+    <input type="hidden" name="{{ action_checkbox_name }}" value="{{ obj.pk }}" />
     {% endfor %}
     <input type="hidden" name="action" value="delete_selected" />
     <input type="hidden" name="post" value="yes" />
