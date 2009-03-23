@@ -454,54 +454,66 @@ class ModelAdmin(BaseModelAdmin):
             description = capfirst(action.replace('_', ' '))
         return func, action, description
 
-    def delete_selected(self, request, selected):
+    def delete_selected(self, request, queryset):
         """
         Default action which deletes the selected objects.
+        
+        In the first step, it displays a confirmation page whichs shows all
+        the deleteable objects or, if the user has no permission one of the
+        related childs (foreignkeys) it displays a "permission denied" message.
+        
+        In the second step delete all selected objects and display the change
+        list again.
         """
         opts = self.model._meta
         app_label = opts.app_label
 
+        # Check that the user has delete permission for the actual model
         if not self.has_delete_permission(request):
             raise PermissionDenied
 
-        # Populate deleted_objects, a data structure of all related objects that
+        # Populate deletable_objects, a data structure of all related objects that
         # will also be deleted.
-
-        # deleted_objects must be a list if we want to use '|unordered_list' in the template
-        deleted_objects = []
+        
+        # deletable_objects must be a list if we want to use '|unordered_list' in the template
+        deletable_objects = []
         perms_needed = set()
         i = 0
-        for obj in selected:
-            deleted_objects.append([mark_safe(u'%s: <a href="%s/">%s</a>' % (escape(force_unicode(capfirst(opts.verbose_name))), obj.pk, escape(obj))), []])
-            get_deleted_objects(deleted_objects[i], perms_needed, request.user, obj, opts, 1, self.admin_site, levels_to_root=2)
+        for obj in queryset:
+            deletable_objects.append([mark_safe(u'%s: <a href="%s/">%s</a>' % (escape(force_unicode(capfirst(opts.verbose_name))), obj.pk, escape(obj))), []])
+            get_deleted_objects(deletable_objects[i], perms_needed, request.user, obj, opts, 1, self.admin_site, levels_to_root=2)
             i=i+1
 
         # The user has already confirmed the deletion.
+        # Do the deletion and return a None to display the change list view again.
         if request.POST.get('post'):
             if perms_needed:
                 raise PermissionDenied
-            n = selected.count()
+            n = queryset.count()
             if n:
-                for obj in selected:
+                for obj in queryset:
                     obj_display = force_unicode(obj)
                     self.log_deletion(request, obj, obj_display)
-                selected.delete()
+                queryset.delete()
                 self.message_user(request, _("Successfully deleted %d %s.") % (
                     n, model_ngettext(self.opts, n)
                 ))
+            # Return None to display the change list page again.
             return None
 
         context = {
             "title": _("Are you sure?"),
             "object_name": force_unicode(opts.verbose_name),
-            "deleted_objects": deleted_objects,
-            'selected': selected,
+            "deletable_objects": deletable_objects,
+            'queryset': queryset,
             "perms_lacking": perms_needed,
             "opts": opts,
             "root_path": self.admin_site.root_path,
             "app_label": app_label,
             'action_checkbox_name': helpers.ACTION_CHECKBOX_NAME,
         }
+        
+        # Display the confirmation page
         return render_to_response(self.delete_confirmation_template or [
             "admin/%s/%s/delete_selected_confirmation.html" % (app_label, opts.object_name.lower()),
             "admin/%s/delete_selected_confirmation.html" % app_label,
