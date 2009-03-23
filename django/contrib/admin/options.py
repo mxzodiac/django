@@ -416,6 +416,10 @@ class ModelAdmin(BaseModelAdmin):
 
 
     def get_actions(self, request=None):
+        """
+        Return a dictionary mapping the names of all actions for this
+        ModelAdmin to a tuple of (callable, name, description) for each action.
+        """
         actions = {}
         for klass in [self.admin_site] + self.__class__.mro()[::-1]:
             for action in getattr(klass, 'actions', []):
@@ -424,6 +428,10 @@ class ModelAdmin(BaseModelAdmin):
         return actions
 
     def get_action_choices(self, request=None, default_choices=BLANK_CHOICE_DASH):
+        """
+        Return a list of choices for use in a form object.  Each choice is a
+        tuple (name, description).
+        """
         choices = [] + default_choices
         for func, name, description in self.get_actions(request).itervalues():
             choice = (name, description % model_format_dict(self.opts))
@@ -431,6 +439,11 @@ class ModelAdmin(BaseModelAdmin):
         return choices
 
     def get_action(self, action):
+        """
+        Return a given action from a parameter, which can either be a calable,
+        or the name of a method on the ModelAdmin.  Return is a tuple of
+        (callable, name, description).
+        """
         if callable(action):
             func = action
             action = action.__name__
@@ -637,6 +650,9 @@ class ModelAdmin(BaseModelAdmin):
             return HttpResponseRedirect("../")
 
     def response_action(self, request, queryset):
+        """
+        If a bulk action is used this determines the response for it.
+        """
         if request.method == 'POST':
             # There can be multiple action forms on the page (at the top
             # and bottom of the change list, for example). Get the action
