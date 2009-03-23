@@ -38,6 +38,14 @@ There are five steps in activating the Django admin site:
        ``ModelAdmin`` classes.
 
     5. Hook the ``AdminSite`` instance into your URLconf.
+    
+Other topics
+------------
+
+.. toctree::
+   :maxdepth: 1
+   
+   actions
 
 ``ModelAdmin`` objects
 ======================
@@ -1151,7 +1159,6 @@ or add anything you like. Then, simply create an instance of your
 Python class), and register your models and ``ModelAdmin`` subclasses
 with it instead of using the default.
 
-
 Hooking ``AdminSite`` instances into your URLconf
 -------------------------------------------------
 
@@ -1189,7 +1196,6 @@ In this example, we register the ``AdminSite`` instance
 There is really no need to use autodiscover when using your own ``AdminSite``
 instance since you will likely be importing all the per-app admin.py modules
 in your ``myproject.admin`` module.
-
 
 Multiple admin sites in the same URLconf
 ----------------------------------------
