@@ -414,7 +414,6 @@ class ModelAdmin(BaseModelAdmin):
     action_checkbox.short_description = mark_safe('<input type="checkbox" id="action-toggle" />')
     action_checkbox.allow_tags = True
 
-
     def get_actions(self, request=None):
         """
         Return a dictionary mapping the names of all actions for this
@@ -651,38 +650,45 @@ class ModelAdmin(BaseModelAdmin):
 
     def response_action(self, request, queryset):
         """
-        If a bulk action is used this determines the response for it.
+        Handle an admin action. This is called if a request is POSTed to the
+        changelist; it returns an HttpResponse if the action was handled, and
+        None otherwise.
         """
-        if request.method == 'POST':
-            # There can be multiple action forms on the page (at the top
-            # and bottom of the change list, for example). Get the action
-            # whose button was pushed.
-            try:
-                action_index = int(request.POST.get('index', 0))
-            except ValueError:
-                action_index = 0
-            data = {}
-            for key in request.POST:
-                if key not in (helpers.ACTION_CHECKBOX_NAME, 'index'):
-                    data[key] = request.POST.getlist(key)[action_index]
-            action_form = self.action_form(data, auto_id=None)
-            action_form.fields['action'].choices = self.get_action_choices(request)
+        # There can be multiple action forms on the page (at the top
+        # and bottom of the change list, for example). Get the action
+        # whose button was pushed.
+        try:
+            action_index = int(request.POST.get('index', 0))
+        except ValueError:
+            action_index = 0
 
-            if action_form.is_valid():
-                action = action_form.cleaned_data['action']
-                func, name, description = self.get_actions(request)[action]
-                selected = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
-                results = queryset.filter(pk__in=selected)
-                response = func(request, results)
-                if isinstance(response, HttpResponse):
-                    return response
-                else:
-                    redirect_to = "."
-                    return HttpResponseRedirect(redirect_to)
-        else:
-            action_form = self.action_form(auto_id=None)
-            action_form.fields['action'].choices = self.get_action_choices(request)
-        return action_form
+        # Construct the action form.
+        data = request.POST.copy()
+        data.pop(helpers.ACTION_CHECKBOX_NAME, None)
+        data.pop("index", None)
+        action_form = self.action_form(data, auto_id=None)
+        action_form.fields['action'].choices = self.get_action_choices(request)
+
+        # If the form's valid we can handle the action.
+        if action_form.is_valid():
+            action = action_form.cleaned_data['action']
+            func, name, description = self.get_actions(request)[action]
+            
+            # Get the list of selected PKs. If nothing's selected, we can't 
+            # perform an action on it, so bail.
+            selected = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
+            if not selected:
+                return None
+
+            response = func(request, queryset.filter(pk__in=selected))
+                        
+            # Actions may return an HttpResponse, which will be used as the
+            # response from the POST. If not, we'll be a good little HTTP
+            # citizen and redirect back to the changelist page.
+            if isinstance(response, HttpResponse):
+                return response
+            else:
+                return HttpResponseRedirect(".")
 
     def add_view(self, request, form_url='', extra_context=None):
         "The 'add' admin view for this model."
@@ -876,10 +882,14 @@ class ModelAdmin(BaseModelAdmin):
                 return render_to_response('admin/invalid_setup.html', {'title': _('Database error')})
             return HttpResponseRedirect(request.path + '?' + ERROR_FLAG + '=1')
 
-        action_form_or_response = self.response_action(request, queryset=cl.get_query_set())
-        if isinstance(action_form_or_response, HttpResponse):
-            return action_form_or_response
-
+        # If the request was POSTed, this might be a bulk action or a bulk edit.
+        # Try to look up an action first, but if this isn't an action the POST
+        # will fall through to the bulk edit check, below.
+        if request.method == 'POST':
+            response = self.response_action(request, queryset=cl.get_query_set())
+            if response:
+                return response
+                
         # If we're allowing changelist editing, we need to construct a formset
         # for the changelist given all the fields to be edited. Then we'll
         # use the formset to validate/process POSTed data.
@@ -924,6 +934,10 @@ class ModelAdmin(BaseModelAdmin):
             media = self.media + formset.media
         else:
             media = self.media
+            
+        # Build the action form and populate it with available actions.
+        action_form = self.action_form(auto_id=None)
+        action_form.fields['action'].choices = self.get_action_choices(request)        
 
         context = {
             'title': cl.title,
@@ -933,7 +947,7 @@ class ModelAdmin(BaseModelAdmin):
             'has_add_permission': self.has_add_permission(request),
             'root_path': self.admin_site.root_path,
             'app_label': app_label,
-            'action_form': action_form_or_response,
+            'action_form': action_form,
             'actions_on_top': self.actions_on_top,
             'actions_on_bottom': self.actions_on_bottom,
         }
