@@ -7,6 +7,7 @@ if __name__ == '__main__':
     settings.configure()
 
 import os
+import traceback
 import unittest
 from datetime import datetime, timedelta
 
@@ -18,9 +19,10 @@ from django.utils.translation import activate, deactivate, ugettext as _
 from django.utils.safestring import mark_safe
 from django.utils.tzinfo import LocalTimezone
 
-from unicode import unicode_tests
 from context import context_tests
+from custom import custom_filters
 from parser import filter_parsing, variable_parsing
+from unicode import unicode_tests
 
 try:
     from loaders import *
@@ -34,6 +36,7 @@ __test__ = {
     'unicode': unicode_tests,
     'context': context_tests,
     'filter_parsing': filter_parsing,
+    'custom_filters': custom_filters,
 }
 
 #################################
@@ -205,10 +208,11 @@ class Templates(unittest.TestCase):
                 try:
                     test_template = loader.get_template(name)
                     output = self.render(test_template, vals)
-                except Exception, e:
-                    if e.__class__ != result:
-                        raise
-                        failures.append("Template test (TEMPLATE_STRING_IF_INVALID='%s'): %s -- FAILED. Got %s, exception: %s" % (invalid_str, name, e.__class__, e))
+                except Exception:
+                    exc_type, exc_value, exc_tb = sys.exc_info()
+                    if exc_type != result:
+                        tb = '\n'.join(traceback.format_exception(exc_type, exc_value, exc_tb))
+                        failures.append("Template test (TEMPLATE_STRING_IF_INVALID='%s'): %s -- FAILED. Got %s, exception: %s\n%s" % (invalid_str, name, exc_type, exc_value, tb))
                     continue
                 if output != result:
                     failures.append("Template test (TEMPLATE_STRING_IF_INVALID='%s'): %s -- FAILED. Expected %r, got %r" % (invalid_str, name, result, output))
@@ -225,7 +229,8 @@ class Templates(unittest.TestCase):
         settings.TEMPLATE_DEBUG = old_td
         settings.TEMPLATE_STRING_IF_INVALID = old_invalid
 
-        self.assertEqual(failures, [], '\n'.join(failures))
+        self.assertEqual(failures, [], "Tests failed:\n%s\n%s" %
+            ('-'*70, ("\n%s\n" % ('-'*70)).join(failures)))
 
     def render(self, test_template, vals):
         return test_template.render(template.Context(vals[1]))
@@ -656,6 +661,8 @@ class Templates(unittest.TestCase):
             'include02': ('{% include "basic-syntax02" %}', {'headline': 'Included'}, "Included"),
             'include03': ('{% include template_name %}', {'template_name': 'basic-syntax02', 'headline': 'Included'}, "Included"),
             'include04': ('a{% include "nonexistent" %}b', {}, "ab"),
+            'include 05': ('template with a space', {}, 'template with a space'),
+            'include06': ('{% include "include 05"%}', {}, 'template with a space'),
 
             ### NAMED ENDBLOCKS #######################################################
 
@@ -754,6 +761,12 @@ class Templates(unittest.TestCase):
 
             # Inheritance from a template that doesn't have any blocks
             'inheritance27': ("{% extends 'inheritance26' %}", {}, 'no tags'),
+
+            # Set up a base template with a space in it.
+            'inheritance 28': ("{% block first %}!{% endblock %}", {}, '!'),
+
+            # Inheritance from a template with a space in its name should work.
+            'inheritance29': ("{% extends 'inheritance 28' %}", {}, '!'),
 
             ### I18N ##################################################################
 
