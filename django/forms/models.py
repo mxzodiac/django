@@ -545,7 +545,11 @@ class BaseInlineFormSet(BaseModelFormSet):
         if self._pk_field == self.fk:
             form.fields[self._pk_field.name] = InlineForeignKeyField(self.instance, pk_field=True)
         else:
-            form.fields[self.fk.name] = InlineForeignKeyField(self.instance, label=form.fields[self.fk.name].label)
+            # The foreign key field might not be on the form, so we poke at the
+            # Model field to get the label, since we need that for error messages.
+            form.fields[self.fk.name] = InlineForeignKeyField(self.instance,
+                label=getattr(form.fields.get(self.fk.name), 'label', capfirst(self.fk.verbose_name))
+            )
 
 def _get_foreign_key(parent_model, model, fk_name=None):
     """
@@ -760,6 +764,7 @@ class ModelMultipleChoiceField(ModelChoiceField):
         'list': _(u'Enter a list of values.'),
         'invalid_choice': _(u'Select a valid choice. %s is not one of the'
                             u' available choices.'),
+        'invalid_pk_value': _(u'"%s" is not a valid value for a primary key.')
     }
 
     def __init__(self, queryset, cache_choices=False, required=True,
@@ -782,6 +787,8 @@ class ModelMultipleChoiceField(ModelChoiceField):
                 obj = self.queryset.get(pk=val)
             except self.queryset.model.DoesNotExist:
                 raise ValidationError(self.error_messages['invalid_choice'] % val)
+            except ValueError:
+                raise ValidationError(self.error_messages['invalid_pk_value'] % val)
             else:
                 final_values.append(obj)
         return final_values
