@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from django.db import models
 from django.contrib import admin
+from django.core.mail import EmailMessage
 
 class Section(models.Model):
     """
@@ -142,10 +143,10 @@ class Person(models.Model):
     name = models.CharField(max_length=100)
     gender = models.IntegerField(choices=GENDER_CHOICES)
     alive = models.BooleanField()
-    
+
     def __unicode__(self):
         return self.name
-    
+
     class Meta:
         ordering = ["id"]
 
@@ -199,6 +200,67 @@ class PersonaAdmin(admin.ModelAdmin):
         BarAccountAdmin
     )
 
+class Subscriber(models.Model):
+    name = models.CharField(blank=False, max_length=80)
+    email = models.EmailField(blank=False, max_length=175)
+
+    def __unicode__(self):
+        return "%s (%s)" % (self.name, self.email)
+
+class SubscriberAdmin(admin.ModelAdmin):
+    actions = ['delete_selected', 'mail_admin']
+
+    def mail_admin(self, request, selected):
+        EmailMessage(
+            'Greetings from a ModelAdmin action',
+            'This is the test email from a admin action',
+            'from@example.com',
+            ['to@example.com']
+        ).send()
+
+class ExternalSubscriber(Subscriber):
+    pass
+
+def external_mail(request, selected):
+    EmailMessage(
+        'Greetings from a function action',
+        'This is the test email from a function action',
+        'from@example.com',
+        ['to@example.com']
+    ).send()
+
+def redirect_to(request, selected):
+    from django.http import HttpResponseRedirect
+    return HttpResponseRedirect('/some-where-else/')
+
+class ExternalSubscriberAdmin(admin.ModelAdmin):
+    actions = [external_mail, redirect_to]
+
+class Media(models.Model):
+    name = models.CharField(max_length=60)
+
+class Podcast(Media):
+    release_date = models.DateField()
+
+class PodcastAdmin(admin.ModelAdmin):
+    list_display = ('name', 'release_date')
+    list_editable = ('release_date',)
+
+    ordering = ('name',)
+
+class Parent(models.Model):
+    name = models.CharField(max_length=128)
+
+class Child(models.Model):
+    parent = models.ForeignKey(Parent, editable=False)
+    name = models.CharField(max_length=30, blank=True)
+
+class ChildInline(admin.StackedInline):
+    model = Child
+
+class ParentAdmin(admin.ModelAdmin):
+    model = Parent
+    inlines = [ChildInline]
 
 admin.site.register(Article, ArticleAdmin)
 admin.site.register(CustomArticle, CustomArticleAdmin)
@@ -208,6 +270,10 @@ admin.site.register(Color)
 admin.site.register(Thing, ThingAdmin)
 admin.site.register(Person, PersonAdmin)
 admin.site.register(Persona, PersonaAdmin)
+admin.site.register(Subscriber, SubscriberAdmin)
+admin.site.register(ExternalSubscriber, ExternalSubscriberAdmin)
+admin.site.register(Podcast, PodcastAdmin)
+admin.site.register(Parent, ParentAdmin)
 
 # We intentionally register Promo and ChapterXtra1 but not Chapter nor ChapterXtra2.
 # That way we cover all four cases:
@@ -221,5 +287,3 @@ admin.site.register(Persona, PersonaAdmin)
 admin.site.register(Book, inlines=[ChapterInline])
 admin.site.register(Promo)
 admin.site.register(ChapterXtra1)
-
-

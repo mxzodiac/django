@@ -272,14 +272,14 @@ class Model(object):
 
         for field in fields_iter:
             is_related_object = False
+            # This slightly odd construct is so that we can access any
+            # data-descriptor object (DeferredAttribute) without triggering its
+            # __get__ method.
+            if (field.attname not in kwargs and
+                    isinstance(self.__class__.__dict__.get(field.attname), DeferredAttribute)):
+                # This field will be populated on request.
+                continue
             if kwargs:
-                # This slightly odd construct is so that we can access any
-                # data-descriptor object (DeferredAttribute) without triggering
-                # its __get__ method.
-                if (field.attname not in kwargs and
-                        isinstance(self.__class__.__dict__.get(field.attname), DeferredAttribute)):
-                    # This field will be populated on request.
-                    continue
                 if isinstance(field.rel, ManyToOneRel):
                     try:
                         # Assume object instance was passed in.
@@ -348,9 +348,9 @@ class Model(object):
         need to do things manually, as they're dynamically created classes and
         only module-level classes can be pickled by the default path.
         """
-        if not self._deferred:
-            return super(Model, self).__reduce__()
         data = self.__dict__
+        if not self._deferred:
+            return (self.__class__, (), data)
         defers = []
         pk_val = None
         for field in self._meta.fields:
@@ -519,7 +519,17 @@ class Model(object):
                 else:
                     sub_obj._collect_sub_objects(seen_objs, self.__class__, related.field.null)
             else:
-                for sub_obj in getattr(self, rel_opts_name).all():
+                # To make sure we can access all elements, we can't use the
+                # normal manager on the related object. So we work directly
+                # with the descriptor object.
+                for cls in self.__class__.mro():
+                    if rel_opts_name in cls.__dict__:
+                        rel_descriptor = cls.__dict__[rel_opts_name]
+                        break
+                else:
+                    raise AssertionError("Should never get here.")
+                delete_qs = rel_descriptor.delete_manager(self).all()
+                for sub_obj in delete_qs:
                     sub_obj._collect_sub_objects(seen_objs, self.__class__, related.field.null)
 
         # Handle any ancestors (for the model-inheritance case). We do this by
