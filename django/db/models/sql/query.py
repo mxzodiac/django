@@ -196,7 +196,7 @@ class BaseQuery(object):
         obj.distinct = self.distinct
         obj.select_related = self.select_related
         obj.related_select_cols = []
-        obj.aggregates = self.aggregates.copy()
+        obj.aggregates = deepcopy(self.aggregates)
         if self.aggregate_select_mask is None:
             obj.aggregate_select_mask = None
         else:
@@ -784,8 +784,6 @@ class BaseQuery(object):
                 aliases.add(r)
                 if with_aliases:
                     col_aliases.add(field.column)
-        if as_pairs:
-            return result, aliases
         return result, aliases
 
     def get_from_clause(self):
@@ -2368,4 +2366,3 @@ def add_to_dict(data, key, value):
         data[key].add(value)
     else:
         data[key] = set([value])
-

@@ -887,7 +887,7 @@ many possibilities of customization. Inlines are built around
 ``form``
 ~~~~~~~~
 
-The value for ``form`` is inherited from ``ModelAdmin``. This is what is
+The value for ``form`` defaults to ``BaseModelForm``. This is what is
 passed through to ``formset_factory`` when creating the formset for this
 inline.
 
@@ -1130,6 +1130,7 @@ Templates which may be overridden per app or model
 Not every template in ``contrib\admin\templates\admin`` may be overridden per
 app or per model. The following can:
 
+    * ``app_index.html``
     * ``change_form.html``
     * ``change_list.html``
     * ``delete_confirmation.html``
