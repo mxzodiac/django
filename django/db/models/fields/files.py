@@ -135,6 +135,17 @@ class FieldFile(File):
         return {'name': self.name, 'closed': False, '_committed': True, '_file': None}
 
 class FileDescriptor(object):
+    """
+    The descriptor for the file attribute on the model instance. Returns a
+    FieldFile when accessed so you can do stuff like::
+    
+        >>> instance.file.size
+        
+    Assigns a file object on assignment so you can do::
+    
+        >>> instance.file = File(...)
+        
+    """
     def __init__(self, field):
         self.field = field
 
@@ -164,6 +175,7 @@ class FileDescriptor(object):
 
 class FileField(Field):
     attr_class = FieldFile
+    descriptor_class = FileDescriptor
 
     def __init__(self, verbose_name=None, name=None, upload_to='', storage=None, **kwargs):
         for arg in ('primary_key', 'unique'):
@@ -203,7 +215,7 @@ class FileField(Field):
 
     def contribute_to_class(self, cls, name):
         super(FileField, self).contribute_to_class(cls, name)
-        setattr(cls, self.name, FileDescriptor(self))
+        setattr(cls, self.name, self.descriptor_class(self))
         signals.post_delete.connect(self.delete_file, sender=cls)
 
     def delete_file(self, instance, sender, **kwargs):
@@ -243,19 +255,40 @@ class FileField(Field):
         defaults.update(kwargs)
         return super(FileField, self).formfield(**defaults)
 
-class ImageFieldFile(ImageFile, FieldFile):
-    def save(self, name, content, save=True):
-        # Repopulate the image dimension cache.
-        self._dimensions_cache = get_image_dimensions(content)
-
-        # Update width/height fields, if needed
+class ImageFileDescriptor(FileDescriptor):
+    """
+    Just like the FileDescriptor, but for ImageFields. The only difference is
+    assigning the width/height to the width_field/height_field, if appropriate.
+    """
+    def __set__(self, instance, value):
+        super(ImageFileDescriptor, self).__set__(instance, value)
+        
+        # The rest of this method deals with width/height fields, so we can
+        # bail early if neither is used.
+        if not self.field.width_field and not self.field.height_field:
+            return
+        
+        # We need to call the descriptor's __get__ to coerce this assigned 
+        # value into an instance of the right type (an ImageFieldFile, in this
+        # case).
+        value = self.__get__(instance)
+        
+        if not value:
+            return
+        
+        # Get the image dimensions.
+        from django.core.files.images import get_image_dimensions
+        value.open()
+        width, height = get_image_dimensions(value)
+        value.close()
+        
+        # Update the width and height fields
         if self.field.width_field:
-            setattr(self.instance, self.field.width_field, self.width)
+            setattr(value.instance, self.field.width_field, width)
         if self.field.height_field:
-            setattr(self.instance, self.field.height_field, self.height)
+            setattr(value.instance, self.field.height_field, height)
 
-        super(ImageFieldFile, self).save(name, content, save)
-
+class ImageFieldFile(ImageFile, FieldFile):
     def delete(self, save=True):
         # Clear the image dimensions cache
         if hasattr(self, '_dimensions_cache'):
@@ -264,6 +297,7 @@ class ImageFieldFile(ImageFile, FieldFile):
 
 class ImageField(FileField):
     attr_class = ImageFieldFile
+    descriptor_class = ImageFileDescriptor
 
     def __init__(self, verbose_name=None, name=None, width_field=None, height_field=None, **kwargs):
         self.width_field, self.height_field = width_field, height_field
